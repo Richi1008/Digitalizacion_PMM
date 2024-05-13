@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/css/bootstrap.min.css"
+        integrity="sha384-zCbKRCUGaJDkqS1kPbPd7TeP5iyJE0EjAuZQTgFLD2ylzuqKfdKlfG/eSrtxUkn" crossorigin="anonymous" />
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.8.0/css/bootstrap-datepicker.standalone.css" />
+    <title>IMPORTADOR DE OBJETIVOS (OB) DE CLIENTES</title>
+</head>
+
+<body>
+    <div class="navbar navbar-dark bg-primary">
+        <span class="navbar-brand">IMPORTADOR DE OBJETIVOS (OB) DE CLIENTES</span>
+        <a style="background-color: white; border-radius: 40px; padding-left: 10px; padding-right: 10px;"
+            class="navbar-brand" href="#">
+            <img src="https://yt3.ggpht.com/ytc/AKedOLSVkKK_bC8iLabj7mNeAsRxiH_6ldfQUeHsIjS_=s900-c-k-c0x00ffffff-no-rj"
+                width="35" height="35" alt="">
+        </a>
+    </div>
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-md-3">
+                <button class="btn btn-success" name="btoaccion" onclick="WriteFile();">
+                    PROCESAR
+                </button>
+            </div>
+            <div class="col-md-3">
+                <button type="button" class="btn btn-info" data-toggle="modal" data-target="#ModalEstrucutra">
+                    Estructura
+                </button>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <p>DATOS A CARGAR</p>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12">
+                <textarea id="TextAreaCarga" class="rounded border border-primary col-md-12" rows="10"></textarea>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <p>LOG DE CARGAR</p>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12">
+                <textarea id="TextAreaLog" class="rounded border border-primary col-md-12" rows="20"
+                    readonly></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para visualizar la estructura de carga-->
+    <div class="modal fade" id="ModalEstrucutra" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog modal-xl" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLongTitle">
+                        Ejemplo de estructura de carga
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="overflow-auto" id="modal-body">
+                    <div class="container">
+                        <div class="row">
+                            <div class="col">
+                                <table id="myTable" class="table table-striped table-bordered table-hover">
+                                    <thead>
+                                        <tr class="table-primary">
+                                            <th colspan="11">
+                                                <center>PEGAR EN PWST CON TODO Y ENCABEZADOS</center>
+                                            </th>
+                                        </tr>
+                                        <tr>
+                                            <td>Periodo(AAAAMM)</td>
+                                            <td>Afiliada(codigo empresa)</td>
+                                            <td>Codigo cliente(vendedor)</td>
+                                            <td>Codigo cliente(SAP code)</td>
+                                            <td>OB Afiliada(Unidades)</td>
+                                            <td>OB Cliente(Unidades)</td>
+                                            <td>OB Ruta(Unidades)</td>
+                                            <td>Marca(Codigo correspondiente a la familia)</td>
+                                            <td>OB Marca(Unidades)</td>
+                                            <td>Codigo de submarca(Codigo de submarca )</td> 
+                                            <td>OB Submarca(Unidades)</td>  
+ 										</tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <th>Periodo</th>
+                                            <th>Afiliada</th>
+                                            <th>Codigo ruta</th>
+                                            <th>Codigo cliente</th>
+                                            <th>OB Afiliada</th>
+                                            <th>OB Cliente</th>
+                                            <th>OB Ruta</th>
+                                            <th>Marca</th>
+                                            <th>OB Marca</th>
+                                            <th>Codigo de submarca</th>
+                                            <th>OB submarca</th>                                                                                      
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success" data-dismiss="modal" onclick="fnExcelReport()">
+                        TxT
+                    </button>
+                    <button type="button" class="btn btn-danger" data-dismiss="modal">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Comienzan los scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"
+        integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-fQybjgWLrvvRgtW6bFlB7jaZrFsaBXjsOMm/tB9LTS58ONXgqbR9W8oWht/amnpF"
+        crossorigin="anonymous"></script>
+    <!-- script que sirver para el datepicker -->
+    <script src="https://www.eyecon.ro/bootstrap-datepicker/js/bootstrap-datepicker.js" charset="UTF-8"></script>
+    <script language="JavaScript">
+        // Seccion de Utilidades
+        //------------------------------------------------------------------------------------------------
+        // Funcion que sirve para exportar a excel
+        function fnExcelReport() {
+            var pantalla = document.createElement("a");
+            pantalla.setAttribute("id", "link");
+            pantalla.style.display = "none";
+            document.body.appendChild(pantalla);
+            var tab_text = "<table border='2px'><tr bgcolor='#87AFC6'>";
+            var textRange; var j = 0;
+            tab = document.getElementById('myTable'); // id of table
+
+            for (j = 0; j < tab.rows.length; j++) {
+                tab_text = tab_text + tab.rows[j].innerHTML + "</tr>";
+            }
+
+            tab_text = tab_text + "</table>";
+            tab_text = tab_text.replace(/<A[^>]*>|<\/A>/g, "");//remove if u want links in your table
+            tab_text = tab_text.replace(/<img[^>]*>/gi, ""); // remove if u want images in your table
+            tab_text = tab_text.replace(/<input[^>]*>|<\/input>/gi, ""); // reomves input params
+
+            var ua = window.navigator.userAgent;
+            var msie = ua.indexOf("MSIE ");
+
+            if (msie > 0 || !!navigator.userAgent.match(/Trident.*rv\:11\./))      // If Internet Explorer
+            {
+                if (window.navigator.msSaveBlob) {
+                    var blob = new Blob([tab_text], {
+                        type: "application/csv;charset=utf-8;",
+                    });
+                    navigator.msSaveBlob(blob, "importadorObjetivos.txt");
+                }
+            } else {
+                var link = document.getElementById('link'),
+                    nombre = "importadorObjetivos"
+                link.href = 'data:application/vnd.ms-excel;base64,' + window.btoa(tab_text);
+                link.download = nombre;
+                link.click();
+            }
+        }
+
+        //------------------------Terminana las Utilidades-----------------------------------------------//
+
+        var instanceManager = new ActiveXObject(
+            "PwstInstanceManager.InstanceManager"
+        );
+        var PowerStreet = instanceManager.PowerStreet;
+        var oApp = instanceManager.PwstUI;
+        var strM;
+
+        function WriteFile() {
+            var textarea = document.querySelector("#TextAreaCarga");
+            if (textarea.value == "") {
+                PowerStreet.UI.alert("Sin Informacion para procesar");
+            } else {
+                var raiz = unescape(
+                    location.href.substring(
+                        0,
+                        location.href
+                            .substring(0, location.href.length - 1)
+                            .lastIndexOf("/") + 1
+                    )
+                )
+                    .split("file:///")
+                    .join("");
+                //var raiz = "C:/Pwstshared/"
+                var fso, tf, strM, text1;
+                fso = new ActiveXObject("Scripting.FileSystemObject");
+                tf = fso.CreateTextFile(raiz + "importadorObjetivos.txt", true);
+
+                text1 = document.getElementById("TextAreaCarga").innerText;
+                //text1 = text1.replace(/[`~!@#$%^&*()|+\-=?;:'",.<>\{\}\[\]\\\/]/gi, '');
+                tf.WriteLine(text1);
+                tf.Close();
+
+                //Codigo para ejecutar codigo en el servidor
+                var script = PowerStreet.CreateScriptingProcess();
+                var o = document.getElementById("elScript2");
+                script.AddCode("JScript", o.innerHTML);
+                script.Request.AddFile("elarchivo", raiz + "importadorObjetivos.txt");
+                if (script.Run("ejecutar")) {
+                    strM = "";
+                    document.getElementById("TextAreaLog").value =
+                        strM +
+                        " " +
+                        "\n" +
+                        "\n" +
+                        String(script.Response.GetVariable("Msj", ""));
+                    PowerStreet.UI.Alert("IMPORTACION FINALIZADA");
+                }
+                oApp.managepwsterrors();
+            }
+        }
+    </script>
+
+    <script id="elScript2">
+    	var JSON;
+        if (!JSON) {
+            JSON = {};
+        }
+        JSON.stringify = JSON.stringify || function (obj) {
+
+            var t = typeof (obj);
+            if (t != "object" || obj === null) {
+
+                if (t == "string") obj = '"' + obj + '"';
+                return String(obj);
+
+            } else {
+
+                var n, v, json = [],
+                    arr = (obj && obj.constructor == Array);
+
+                for (n in obj) {
+                    v = obj[n];
+                    t = typeof (v);
+
+                    if (t == "string") v = '"' + v + '"';
+                    else if (t == "object" && v !== null) v = JSON.stringify(v);
+
+                    json.push((arr ? "" : '"' + n + '":') + String(v));
+                }
+
+                return (arr ? "[" : "{") + String(json) + (arr ? "]" : "}");
+            }
+        };
+
+        JSON.parse = JSON.parse || function (str) {
+            if (str === "") str = '""';
+            eval("var p=" + str + ";");
+            return p;
+        };
+        
+        var strM = "";
+        
+        function ejecutar(PowerStreet, ObjProcess) {
+            //Polyfill para hacer funcionar el metodo  Trim()
+            if (typeof String.prototype.trim !== "function") {
+                String.prototype.trim = function () {
+                    return this.replace(/^\s+|\s+$/g, "");
+                };
+            }
+
+            var FSO;
+            var fileExist, file, datTex, datTexCount, datTexvalidation;
+            var numC, arrLinearrColEnc, arrCol;
+            
+            FSO = new ActiveXObject("Scripting.FileSystemObject");
+            file = ObjProcess.Request.GetFile("elarchivo");
+            datTex = FSO.OpenTextFile(file);
+            
+            strM += "INICIO DE IMPORTACION" + "\n";
+
+            datTexCount = FSO.OpenTextFile(file);
+            var numC = datTexCount.ReadAll();
+            var NumFil = numC.split("\n");
+            var num = NumFil.length - 1;
+            datTexCount.close();
+
+            arrLine = datTex.readLine();
+            arrColEnc = arrLine.split("\t");
+            var totCol = arrColEnc.length;
+            var arrData = [];
+            var conteo = 0;
+			var elementosNoEncontrados = [];
+			var elementosEncontrados = [];
+			var elementosAValidar = ["periodo",	"afiliada", "codigo ruta",	"codigo cliente",  "ob afiliada", "ob cliente", "ob ruta", "marca", "ob marca", "codigo de submarca", "ob submarca"];
+				
+            for (u = 0; u < totCol; u++) {
+            	var atributo = arrColEnc[u].toLowerCase().trim();
+				var encontrado = false;
+				
+				for (var j = 0; j < elementosAValidar.length; j++) {
+					if (elementosAValidar[j] === atributo) {
+						elementosEncontrados.push(atributo);
+						encontrado = true;
+						break;
+					}
+				}
+				
+				if (!encontrado) {
+					elementosNoEncontrados.push(atributo);
+				}
+										
+            }
+            
+			if (elementosNoEncontrados.length === 0) {
+				var elementosFaltantes = [];
+				for (var k = 0; k < elementosAValidar.length; k++) {
+					var elementoFaltante = true;
+					for (var l = 0; l < elementosEncontrados.length; l++) {
+						if (elementosAValidar[k] === elementosEncontrados[l]) {
+							elementoFaltante = false;
+							break;
+						}
+					}
+					if (elementoFaltante) {
+						elementosFaltantes.push(elementosAValidar[k]);
+					}
+				}
+				
+				if (elementosFaltantes.length === 0) {
+					
+					for (a = 0; a < totCol; a++) {
+		                
+	                    // Se recorre la primera fila
+	                    while (!datTex.AtEndOfStream) {
+	                        arrLine = datTex.readLine();
+	                        arrCol = arrLine.split("\t");
+	                        if (arrCol.length == totCol) {
+	                            var objData = new Object();
+	                            for (c = 0; c < arrCol.length; c++) {
+	                                var dato = arrCol[c];
+	                                if (dato != "") {
+	                                    swtAtributos(arrColEnc[c].toLowerCase(), dato, objData);
+	                                }
+	                            }
+	                            arrData.push(objData);
+	                        } else {
+	                            strM += "\t" + "\t" + "ERROR: Linea no procesada " + "\n" + arrCol + "\n";
+	                        }
+	                    }
+		            }
+	            
+	            	modificarFecha(arrData, PowerStreet);
+	            	
+				} else {
+					strM += "Elementos que faltan: " + elementosFaltantes.join(", ");
+				}
+	            
+			} else {
+				strM += "Los siguientes elementos no existen: " + elementosNoEncontrados.join(", ");
+			}
+            
+            ObjProcess.Response.SetVariable("Msj", strM);
+        
+        }
+
+        function swtAtributos(atr, dat, objData) {
+        	switch (atr) {
+				case "periodo":
+					objData.periodo = dat;
+					break;
+				case "afiliada":
+					objData.afiliada = dat;
+					break;
+				case "codigo ruta":
+					objData.codvend = dat;
+					break;
+				case "codigo cliente":
+					objData.codclie = dat;
+					break;
+				case "sucursal":
+					objData.sucursal = dat;
+					break;
+				case "clientesap":
+					objData.clientesap = dat;
+					break;					
+				case "ob afiliada":
+					objData.obafiliada = dat;
+					break;
+				case "ob cliente":
+					objData.obcliente = dat;
+					break;					
+				case "ob ruta":
+					objData.obruta = dat;
+					break;
+				case "marca":
+					objData.marca = dat;
+					break;
+				case "ob marca":
+					objData.obmarca = dat;
+					break;
+				case "codigo de submarca":
+					objData.codsubmarca = dat;
+					break;
+				case "ob submarca":
+					objData.obsubmarca = dat;
+					break;
+
+				default:
+					strM += "\t" + "\t" + "Atributo no Existe: " + atr + " : " + dat + "\n";
+					break;
+			}
+		}
+		
+		function changeundefined(valor){
+			
+				if (typeof valor == 'undefined'){
+				return valor = ""
+			
+				} else {
+				return valor 
+				}		
+			}
+		
+		
+	function changeundefinedc(valor){
+			
+				if (typeof valor == 'undefined'){
+				return valor = 0
+			
+				} else {
+				return valor 
+				}		
+			}
+		
+        function modificarFecha(arrData, PowerStreet) {
+            var num = arrData.length;
+            var i = 1;
+            var LRUT;
+            var PWST = new ActiveXObject("PowerStreet.Aplicacion");
+            var ColRutas = PWST.NuevaColeccion();
+            var Ihora = new Date();
+            
+            PowerStreet.UI.ProgressInit("myProgressID", "procesando...", num);
+            var txtsql = ""
+			txtsql += " if object_id('dbo.objetivoobclientes') is null create table dbo.objetivoobclientes(periodo numeric(6), afiliada numeric(5), codigo_ruta char(10), codigo_cliente numeric(7,0), sucursal int , ob_afiliada numeric(12), ob_ruta numeric(12), ob_cliente numeric(12), marca char(4) , ob_marca numeric(12),cod_submarca char(10), ob_submarca numeric(12)); "
+			txtsql += " if object_id('tempdb..#objetivoobclientes') is not null drop table #objetivoobclientes; "
+			txtsql += " create table #objetivoobclientes(periodo numeric(6), afiliada numeric(5), codigo_ruta char(10), codigo_cliente numeric(7,0), sucursal int, ob_afiliada char(12), ob_ruta char(12), ob_cliente char(12), marca char(4) , ob_marca char(12), cod_submarca char(12), ob_submarca char(12)); "
+			
+            strM += "------------------------------" + "\n"
+			strM += "Hora Inicio: " + Hoy(1) + "\n" + "\n";
+				
+            for (var index = 0; index < num; index++) {
+				var obj = arrData[index];
+				var txt = "";
+				
+				txt = validaciondata(obj, PowerStreet);
+				strM += JSON.stringify(obj)  + "\n"	
+			
+				
+				
+                if(txt === "true"){              	  
+                		txtsql += " insert #objetivoobclientes select " + obj.periodo + " ," + obj.afiliada + ",'" + changeundefined(obj.codvend) + "'," + changeundefinedc(obj.codclie) + "," + changeundefinedc(obj.sucursal) + ",'" + changeundefinedc(obj.obafiliada) + "','" + changeundefinedc(obj.obruta) + "','" + changeundefinedc(obj.obcliente) + "','" + changeundefined(obj.marca) + "','" + changeundefinedc(obj.obmarca) + "','" + changeundefined(obj.codsubmarca) + "','" + changeundefinedc(obj.obsubmarca) + "'";                		
+                		strM += "Se cargo correctamente los objetivos" + "\n";
+                } else {
+                	strM += txt;
+                	strM += "No se cargaron correctamente los objetivos" + "\n";
+                }
+                
+                PowerStreet.UI.ProgressUpdate(
+                    "myProgressID",
+                    "procesando..." + i + " de " + num,
+                    i++
+                );
+                
+            }
+            	
+            	txtsql += "select va.periodo ,va.afiliada ,va.codigo_ruta ,va.codigo_cliente,va.sucursal ,va.marca ,va.cod_submarca  from #objetivoobclientes va  group by  va.periodo, va.afiliada,va.codigo_ruta,va.codigo_cliente,va.sucursal, va.marca, va.cod_submarca having count(ob_cliente)>1 "
+				unF = PowerStreet.openRecordset(txtsql)
+                if (unF.recordcount>0){
+                	strM += " Existen datos duplicados" + "\n" ;
+				} else {	
+			   		txtsql += " insert into dbo.objetivoobclientes "
+					txtsql += " Select "
+					txtsql += "  tr.periodo "
+					txtsql += " ,tr.afiliada "
+					txtsql += " ,rtrim(case when tr.codigo_ruta = 'v' then '' else tr.codigo_ruta end) codigo_ruta "
+					txtsql += " ,rtrim(case when tr.codigo_cliente = 0 then 0 else convert(numeric (7,0),(tr.codigo_cliente)) end) codigo_cliente "
+					txtsql += " ,rtrim(case when tr.sucursal = 0 then 0 else convert(int,(tr.sucursal)) end) codigo_cliente "
+					txtsql += " ,(case when tr.ob_afiliada = 'v' then convert(numeric (12), 0) else convert(numeric (12),(tr.ob_afiliada)) end) ob_afiliada "
+					txtsql += " ,(case when tr.ob_ruta = 'v' then convert(numeric (12), 0) else convert(numeric (12),(tr.ob_ruta)) end) ob_ruta "
+					txtsql += " ,(case when tr.ob_cliente = 'v' then convert(numeric (12), 0) else convert(numeric (12),(tr.ob_cliente)) end) ob_cliente "
+					txtsql += " ,rtrim(case when tr.marca = 'v' then '' else tr.marca end) marca "
+					txtsql += " ,(case when tr.ob_marca = 'v' then convert(numeric (12), 0) else convert(numeric (12),(tr.ob_marca)) end) ob_marca "
+					txtsql += " ,rtrim(case when tr.cod_submarca = 'v' then '' else tr.cod_submarca end) cod_submarca "
+					txtsql += " ,(case when tr.ob_submarca = 'v' then convert(numeric (12), 0) else convert(numeric (12),(tr.ob_submarca)) end) ob_submarca "
+					txtsql += " from #objetivoobclientes tr "
+					txtsql += " left join objetivoobclientes ob on ob.periodo = tr.periodo and ob.afiliada = tr.afiliada and tr.codigo_ruta = ob.codigo_ruta and ob.codigo_cliente = tr.codigo_cliente and ob.sucursal = tr.sucursal and ob.marca = tr.marca and ob.cod_submarca = tr.cod_submarca "
+					txtsql += " where ob.periodo is null "	
+					
+					txtsql += "  update a "
+					txtsql += " 	set "
+					txtsql += " 	ob_afiliada = (case when b.ob_afiliada = 'v' then convert(numeric (12), 0) else convert(numeric (12),(b.ob_afiliada)) end )"
+					txtsql += "  	,ob_cliente = (case when b.ob_cliente = 'v' then convert(numeric (12), 0) else convert(numeric (12),(b.ob_cliente)) end) "	
+					txtsql += "		,ob_submarca = (case when b.ob_submarca = 'v' then convert(numeric (12), 0) else convert(numeric (12),(b.ob_submarca)) end) "
+					txtsql += "	    ,ob_marca = (case when b.ob_marca = 'v' then convert(numeric (12), 0) else convert(numeric (12),(b.ob_marca)) end) "
+					txtsql += "     ,ob_ruta = (case when b.ob_ruta = 'v' then convert(numeric (12), 0) else convert(numeric (12),(b.ob_ruta)) end) "
+					txtsql += " from "
+					txtsql += " 	dbo.objetivoobclientes a "
+					txtsql += " 	join #objetivoobclientes b on b.periodo = a.periodo and b.afiliada = a.afiliada and b.codigo_ruta = a.codigo_ruta and b.codigo_cliente = a.codigo_cliente and b.sucursal = a.sucursal and b.marca = a.marca and b.cod_submarca = a.cod_submarca ;"
+ 				
+ 				 	PowerStreet.Execstring(txtsql)
+				 }
+		
+           		 
+           		
+            
+            PowerStreet.UI.ProgressDestroy("myProgressID");
+        }
+
+        function lisError(PowerStreet) {
+            var txt = "";
+            var listaErr = PowerStreet.Errores.ListarErrores;
+            for (var i = 1; i <= listaErr.Count(); i++) {
+                txt = txt + listaErr.item(i).Descripcion + "  ";
+            }
+
+            return txt;
+        }
+
+        function PwstErrores(PowerStreet) {
+            var txt = " ";
+            var texto = " ";
+            var listaErr = PowerStreet.Errores;
+
+            for (var i = 1; i <= listaErr.Count(); i++) {
+                texto = texto + listaErr.item(i).Descripcion + "  ";
+                var temporal = document.createElement("div");
+                temporal.innerHTML = texto;
+                txt = temporal.textContent || temporal.innerText || "";
+            }
+
+            if (txt.length > 1) {
+                return txt;
+            }
+
+            return txt;
+        }
+        
+        function Hoy(hora) {
+			var partFecha, fcFecha, fcTime;
+			fcTime = " ";
+			partFecha = new Date();
+			var dd = partFecha.getDate();
+			var mm = partFecha.getMonth() + 1; //January is 0!
+			var yyyy = partFecha.getFullYear();
+
+			if (dd < 10) dd = '0' + dd;
+			if (mm < 10) mm = '0' + mm;
+
+			if (hora == 1) {
+				var hh = partFecha.getHours()-3;
+				var min = partFecha.getMinutes();
+				var ss = partFecha.getSeconds();
+				if (hh < 10) hh = '0' + hh;
+				if (min < 10) min = '0' + min;
+				if (ss < 10) ss = '0' + ss;
+				fcTime = " " + hh + ':' + min + ':' + ss
+			}
+
+			fcFecha = dd + '-' + mm + '-' + yyyy + fcTime;
+			return fcFecha;
+		}
+
+        
+        function esNumerico(valor) {
+
+		  		if (!isNaN(valor)){
+		  			return true
+		  		} else {
+		  		
+		  		 	return false
+		  		 }
+		  		
+		  
+		}
+        
+		
+		function validaciondata(obj,PowerStreet) {
+			var periodo = obj.periodo;
+			var afiliada = obj.afiliada;
+			var codclie = obj.codclie;
+			var sucursal = obj.sucursal;
+			var codvend = obj.codvend;
+			var obafiliada = obj.obafiliada;
+			var obruta = obj.obruta;
+			var obcliente = obj.obcliente;
+			var marca = obj.marca;
+			var obmarca = obj.obmarca;
+			var codsubmarca = obj.codsubmarca;
+			var obsubmarca = obj.obsubmarca;
+			var clientesap = obj.clientesap
+			var txt = "";
+			
+			// Validar el formato de fecha "yyyymm" en IE7
+			var periodoy = periodo.substring(0,4)
+			var periodom = periodo.substring(4,6)
+			
+			var anioEntero = parseInt(periodoy, 10);
+			
+			if (!isNaN(anioEntero) && anioEntero >= 1900 && anioEntero <= 2099) {
+ 			   
+ 			 } else {
+				txt += "Formato de periodo no valido " + periodo + "\n";
+	
+			}
+			
+			if(txt == ""){
+				
+				
+				// Validar el mes
+				if (periodom < 1 || periodom > 12) {
+					txt += "Mes no existe " + periodom + "\n";
+				
+				} else {
+			
+				
+					objAfiliada = "select distinct rtrim(ac.codigo) empresa from empresa ac  where ac.codigo = " + afiliada + "  ";
+					unA = PowerStreet.openRecordset(objAfiliada)	
+					if (unA.recordcount == 0){
+							txt += "Afiliada no existe en la base ." + afiliada + "\n"  				              						
+						} else { 
+						
+							if (  codclie == undefined  && codvend == undefined && marca == undefined && codsubmarca == undefined && obruta == undefined && obcliente == undefined && obmarca == undefined && obsubmarca == undefined && esNumerico(obafiliada) ){	
+								txt = ""
+								//txt += "Afiliada "+afiliada +  "\n"  
+								//txt += "obafiliada "+obafiliada +  "\n" 
+								} else {  
+
+								if (codclie != 0 && codvend == undefined && marca == undefined && codsubmarca == undefined &&  obruta == undefined && obafiliada == undefined && obmarca == undefined && obsubmarca == undefined && esNumerico(obcliente) ){
+										objcliente = "select distinct rtrim(ac.codigo) cliente, rtrim(sucursal)sucursal, rtrim(ac.codigoak)codigosap from sucursales ac  where  tipocuenta = 1 and ac.codigoak = '" + codclie + "'  ";
+										unC = PowerStreet.openRecordset(objcliente)	
+										if (unC.recordcount == 0){										
+											txt += "cliente no existe en la base " + codclie +   "\n" 		              						
+										}else {
+												obj.codclie = unC.collect(0)
+												obj.sucursal = unC.collect(1)
+												obj.clientesap = unC.collect(2) 
+												txt = ""
+												//txt += "Cliente"+codclie +  "\n"  
+												//txt += "ObCliente "+obcliente +  "\n" 
+												}
+
+								}else {	
+										if (codclie != 0  && marca != "" && codvend == undefined && codsubmarca == undefined && obruta == undefined && obcliente == undefined && obafiliada == undefined && obsubmarca == undefined && esNumerico(obmarca) ){
+										objcliente = "select distinct rtrim(ac.codigo) cliente, rtrim(sucursal)sucursal, rtrim(ac.codigoak)codigosap from sucursales ac  where  tipocuenta = 1 and ac.codigoak = '" + codclie + "' ";
+										unC = PowerStreet.openRecordset(objcliente)	
+										if (unC.recordcount == 0){										
+											txt += "cliente no existe en la base " + codclie +   "\n"  		              						
+										}else {
+												obj.codclie = unC.collect(0)
+												obj.sucursal = unC.collect(1)
+												obj.clientesap = unC.collect(2) 
+										objmarca = "select distinct rtrim(ac.codigo) cliente from familias ac  where  ac.codigo = '" + marca + "'  ";
+										unM = PowerStreet.openRecordset(objmarca)	
+										if (unM.recordcount == 0){										
+											txt += "Marca no existe en la base ." + marca + "\n" 		              						
+										}else {
+												txt = ""
+												//txt += "Cliente"+codclie +  "\n"
+												//txt += "Marca"+marca +  "\n"												
+												//txt += "ObMarca "+obmarca +  "\n" 
+											}
+																						
+										}		
+									}else { 
+																					 
+										if (codvend != "" && codclie == 0 || codclie == undefined && marca == undefined && codsubmarca == undefined && obafiliada == undefined && obcliente == undefined && obmarca == undefined && obsubmarca == undefined && esNumerico(obruta) ){
+
+											objruta = "select distinct rtrim(ac.codigo) cliente from vendedor ac  where  ac.codigo = '" + codvend + "'  ";
+											unV = PowerStreet.openRecordset(objruta)	
+											if (unV.recordcount == 0){										
+												txt += "Ruta no existe en la base ." + codvend + "\n" 		              						
+											}else {
+												txt = ""
+												//txt += "Ruta"+codvend +  "\n"												
+												//txt += "ObRuta "+obruta +  "\n" 
+												}
+												
+										}	else { 
+												if (codclie != 0 && codsubmarca != "" && marca == undefined && codvend == undefined  &&  obruta == undefined && obcliente == undefined && obmarca == undefined && obafiliada == undefined && esNumerico(obsubmarca) ){
+												objcliente = "select distinct rtrim(ac.codigo) cliente, rtrim(sucursal)sucursal, rtrim(ac.codigoak)codigosap from sucursales ac  where  tipocuenta = 1 and ac.codigoak = '" + codclie + "' ";
+												unC = PowerStreet.openRecordset(objcliente)	
+												if (unC.recordcount == 0){										
+													txt += "cliente no existe en la base " + codclie +  "\n"		              						
+												}else {
+														obj.codclie = unC.collect(0)
+														obj.sucursal = unC.collect(1)
+														obj.clientesap = unC.collect(2)
+												objsubmarca = "select distinct rtrim(tp.codigo) articulo from tipoproducto tp  where  tp.codigo = '" + codsubmarca + "'  ";
+												unI = PowerStreet.openRecordset(objsubmarca)	
+												if (unI.recordcount == 0){										
+													txt += "SubMarca no existe en la base ." + codsubmarca + "\n" 		              						
+												}else {
+													txt = ""
+													//txt += "Cliente"+codclie +  "\n"
+													//txt += "Material"+codsubmarca +  "\n"												
+													//txt += "obsubmarca "+obsubmarca +  "\n" 
+													}
+																								
+												}		
+											
+													 
+											} else { 
+												txt += "Revisar que coinsidan los objetivos con la informacio que se esta cargando" + "\n"
+											}
+										
+									
+										}										
+									}
+
+								}	
+							}
+						}
+				}
+			}
+			if(txt == ""){
+				// Agregar la lógica de obtener la semana y el día de la semana aquí
+				//return "Fecha valida, Semana " + numeroSemana + ", " + diaSemana;
+				//txt += "validacion llega hasta abajo"
+				return "true"
+			} else {
+				return txt
+			}
+
+		}
+        
+    </script>
+</body>
+
+</html>
