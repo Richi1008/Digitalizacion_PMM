@@ -1,0 +1,178 @@
+
+IF EXISTS (SELECT * FROM sysobjects WHERE type = 'P' AND name = 'sp_indicador_comprador_general') DROP Procedure sp_indicador_comprador_general;
+
+create procedure [dbo].[sp_indicador_comprador_general]
+
+as
+
+IF (OBJECT_ID('tempdb..#auxcuentaarti')) IS NOT NULL DROP TABLE #auxcuentaarti
+IF (OBJECT_ID('tempdb..#mespmi')) IS NOT NULL DROP TABLE #mespmi
+IF (OBJECT_ID('tempdb..#mespmix2')) IS NOT NULL DROP TABLE #mespmix2
+IF (OBJECT_ID('tempdb..#tipocliente')) IS NOT NULL DROP TABLE #tipocliente
+IF (OBJECT_ID('tempdb..#auxtipocliente')) IS NOT NULL DROP TABLE #auxtipocliente
+IF (OBJECT_ID('tempdb..#manejante')) IS NOT NULL DROP TABLE #manejante
+IF (OBJECT_ID('tempdb..#familiatabaco')) IS NOT NULL DROP TABLE #familiatabaco
+
+--- consulta que ocupo para traer el mes PMI y desde la fecha hasta la fecha correspondiente al mes 
+Select mes ,convert(char(10),min(fecha),103) desdefecha ,convert(char(10),max(fecha),103) hastafecha
+into #mespmi	
+from calendarioventamensual 
+where mes =(Select mes from calendarioventamensual where cast(fecha as date)= cast(getdate()as date))  -- cast((rtrim(datepart(month, (Select mes from calendarioventamensual where cast(fecha as date)= cast(getdate()as date))))) as numeric(2)) 
+and datepart(year, fecha) = datepart(year, getdate())
+group by mes
+
+-- consulta que traigo del reporte de configuraciones para marcar las familias tabaco
+select  fa.codigo, fa.descrip 
+	into #familiatabaco
+from familias fa 
+join configuracion_hoja_digitalizacion chd on Param = (rtrim(fa.descrip) + '_' + rtrim(fa.codigo))
+where tipoconfig = 'Articulos_Tabaco'
+	and chd.Valor1 = 'true'
+order by fa.codigo
+
+ --- comprador general que compran tabaco en el mes PMI
+Select  
+
+	do.cuenta
+	,do.sucursal
+	,sum(da.cantidad*td.indiventa) totalventa
+ into #auxcuentaarti
+from documentos do with(nolock) 
+join docarti da with(nolock)  on do.empresa=da.empresa and do.clavecorr = da.clavecorr and do.serie = da.serie and do.nrodoc = da.nrodoc
+join tipodoc td with(nolock) on td.codigo = do.tipodocum 
+join articulo ar  with(nolock) on ar.codigo = da.articulo
+join #familiatabaco fat with(nolock) on fat.codigo = ar.familia
+join calendarioventamensual ca with(nolock) on cast(ca.fecha as date) = cast(do.fecha as date)
+join #mespmi mpm on  cast (ca.mes as numeric(2)) = cast (mpm.mes as numeric(2))
+join cuentas cu on do.cuenta  = cu.codigo  and do.tipocuenta = cu.tipocuenta 
+where 
+	do.fecha between mpm.desdefecha and mpm.hastafecha  
+	and td.venta>1
+	and do.anulado = 0
+	and ca.laborable = 1 
+	and do.tipocuenta=1
+	and cu.inactivo = 0
+	
+
+group by 
+	do.cuenta, do.sucursal
+	having sum(da.cantidad*td.indiventa)>0
+	
+order by 
+	do.cuenta, do.sucursal
+
+
+
+-- consulta para traer la diferencia de dos meses  desdefecha mes pasado / hastafecha mes actual
+Select  convert(char(10),min(fecha),103) desdefecha ,convert(char(10),max(fecha),103) hastafecha
+into #mespmix2	
+FROM calendarioventamensual
+WHERE mes BETWEEN MONTH(DATEADD(MONTH, -1, GETDATE())) AND MONTH(DATEADD(MONTH, -1, GETDATE())) 
+OR (mes BETWEEN cast((rtrim(datepart(month, GETDATE()))) as numeric(2)) AND cast((rtrim(datepart(month, GETDATE()))) as numeric(2)) and datepart(year, fecha) = datepart(year, getdate()) )
+
+
+-- consulta para traer los clientes recurrentes es decir que compran cualquier articulo dos meses seguidos
+Select  
+
+	do.cuenta
+	,do.sucursal
+	,datepart(month, do.fecha)  mes
+	,sum(da.cantidad*td.indiventa) totalventa
+ into #tipocliente
+from documentos do with(nolock) 
+join docarti da with(nolock)  on do.empresa=da.empresa and do.clavecorr = da.clavecorr and do.serie = da.serie and do.nrodoc = da.nrodoc
+join tipodoc td with(nolock) on td.codigo = do.tipodocum 
+join articulo ar  with(nolock) on ar.codigo = da.articulo
+join cuentas cu on do.cuenta  = cu.codigo  and do.tipocuenta = cu.tipocuenta 
+join calendarioventamensual ca with(nolock) on cast(ca.fecha as date) = cast(do.fecha as date)
+join #mespmix2 mp on 1=1
+where 
+	do.fecha between mp.desdefecha and mp.hastafecha
+	and td.venta>1
+	and do.anulado = 0
+	and ca.laborable = 1 
+	and do.tipocuenta=1
+	and cu.inactivo = 0
+	
+
+group by 
+	do.cuenta, do.sucursal, datepart(month, do.fecha)
+	having sum(da.cantidad*td.indiventa)>0
+	
+order by 
+	do.cuenta, do.sucursal
+	
+
+-- si el cliente y sucursal tienen compra de cualquier articulo en dos meses seguidos es A de lo contrario es B
+Select cuenta, sucursal, case when (count(distinct rtrim(cuenta)+rtrim(sucursal)+rtrim(mes)))>1 then 'A' else 'B' end tipocliente
+	into #auxtipocliente
+ from #tipocliente	
+ 
+ group by cuenta, sucursal
+
+
+
+-- consulta de los clientes que han comprado cualquier articulo en un lapso de 3 meses
+Select  
+
+	do.cuenta
+	,do.sucursal
+	,sum(da.cantidad*td.indiventa) totalventa
+ into #manejante
+from documentos do with(nolock) 
+join docarti da with(nolock)  on do.empresa=da.empresa and do.clavecorr = da.clavecorr and do.serie = da.serie and do.nrodoc = da.nrodoc
+join tipodoc td with(nolock) on td.codigo = do.tipodocum 
+join articulo ar  with(nolock) on ar.codigo = da.articulo
+join calendarioventamensual ca with(nolock) on cast(ca.fecha as date) = cast(do.fecha as date)
+join cuentas cu on do.cuenta  = cu.codigo  and do.tipocuenta = cu.tipocuenta 
+where 
+	do.fecha between DATEADD(MONTH, -3, GETDATE()) and getdate()
+	and td.venta>1
+	and do.anulado = 0
+	and ca.laborable = 1 
+	and do.tipocuenta=1
+	and cu.inactivo = 0
+	
+
+group by 
+	do.cuenta, do.sucursal
+	having sum(da.cantidad*td.indiventa)>0
+	
+order by 
+	do.cuenta, do.sucursal 
+
+ --- consulta donde traigo los manejates   y uno con las tablas de cliente recurrente y cliente comprador de tabaco 
+if object_id('dbo.comprador_general') is null
+create table comprador_general (cuenta numeric(7,0), sucursal int, Comprador_general char(2), tipo_cliente char(1),manejante char(15))
+
+delete from comprador_general
+
+insert into comprador_general
+
+Select  
+	ma.cuenta, ma.sucursal 
+	,case when ti.totalventa >= 1 then 'SI' else 'NO' end Comprador_general
+	,isnull(t.tipocliente,'B') tipo_cliente
+	,case when ma.totalventa >= 1 then 'Manejante' else 'NO Manejante' end manejante
+
+from #manejante ma 
+ left join #auxcuentaarti ti on ti.cuenta = ma.cuenta and ti.sucursal = ma.sucursal
+ left join #auxtipocliente t on t.cuenta = ma.cuenta  and t.sucursal =  ma.sucursal
+
+
+;
+
+
+IF (OBJECT_ID('tempdb..#auxcuentaarti')) IS NOT NULL DROP TABLE #auxcuentaarti
+IF (OBJECT_ID('tempdb..#mespmi')) IS NOT NULL DROP TABLE #mespmi
+IF (OBJECT_ID('tempdb..#mespmix2')) IS NOT NULL DROP TABLE #mespmix2
+IF (OBJECT_ID('tempdb..#tipocliente')) IS NOT NULL DROP TABLE #tipocliente
+IF (OBJECT_ID('tempdb..#auxtipocliente')) IS NOT NULL DROP TABLE #auxtipocliente
+IF (OBJECT_ID('tempdb..#manejante')) IS NOT NULL DROP TABLE #manejante
+IF (OBJECT_ID('tempdb..#familiatabaco')) IS NOT NULL DROP TABLE #familiatabaco
+
+SELECT name FROM sysobjects WHERE type = 'P' AND name = 'sp_indicador_comprador_general'
+
+
+
+#createcolumns
