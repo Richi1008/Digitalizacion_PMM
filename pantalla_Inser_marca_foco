@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/css/bootstrap.min.css"
+        integrity="sha384-zCbKRCUGaJDkqS1kPbPd7TeP5iyJE0EjAuZQTgFLD2ylzuqKfdKlfG/eSrtxUkn" crossorigin="anonymous" />
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.8.0/css/bootstrap-datepicker.standalone.css" />
+    <title>Activador grafico marca foco</title>
+</head>
+
+<body>
+    <div class="navbar navbar-dark bg-primary">
+        <span class="navbar-brand">Activador grafico marca foco</span>
+        <a style="background-color: white; border-radius: 40px; padding-left: 10px; padding-right: 10px;"
+            class="navbar-brand" href="#">
+            <img src="https://yt3.ggpht.com/ytc/AKedOLSVkKK_bC8iLabj7mNeAsRxiH_6ldfQUeHsIjS_=s900-c-k-c0x00ffffff-no-rj"
+                width="35" height="35" alt="">
+        </a>
+    </div>
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-md-3">
+                <button class="btn btn-success" name="btoaccion" onclick="WriteFile();">
+                    PROCESAR
+                </button>
+            </div>
+            <div class="col-md-3">
+                <button type="button" class="btn btn-info" data-toggle="modal" data-target="#ModalEstrucutra">
+                    Estructura
+                </button>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <p>DATOS A CARGAR</p>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12">
+                <textarea id="TextAreaCarga" class="rounded border border-primary col-md-12" rows="10"></textarea>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <p>LOG DE CARGAR</p>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12">
+                <textarea id="TextAreaLog" class="rounded border border-primary col-md-12" rows="20"
+                    readonly></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para visualizar la estructura de carga-->
+    <div class="modal fade" id="ModalEstrucutra" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog modal-xl" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLongTitle">
+                        Ejemplo de estructura de carga
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="overflow-auto" id="modal-body">
+                    <div class="container">
+                        <div class="row">
+                            <div class="col">
+                                <table id="myTable" class="table table-striped table-bordered table-hover">
+                                    <thead>
+                                        <tr class="table-primary">
+                                            <th colspan="3">
+                                                <center>PEGAR EN PWST CON TODO Y ENCABEZADOS</center>
+                                            </th>
+                                        </tr>
+                                        <tr>
+                                            <td>Codigo de la marca</td>
+                                            <td>Activo = 1 Inactivo = 0</td>
+                                            <td>vendedor o ruta</td>
+ 										</tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <th>Codigo Familia</th>
+                                            <th>Activo</th>
+                                            <th>Vendedor</th>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success" data-dismiss="modal" onclick="fnExcelReport()">
+                        TxT
+                    </button>
+                    <button type="button" class="btn btn-danger" data-dismiss="modal">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Comienzan los scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"
+        integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-fQybjgWLrvvRgtW6bFlB7jaZrFsaBXjsOMm/tB9LTS58ONXgqbR9W8oWht/amnpF"
+        crossorigin="anonymous"></script>
+    <!-- script que sirver para el datepicker -->
+    <script src="https://www.eyecon.ro/bootstrap-datepicker/js/bootstrap-datepicker.js" charset="UTF-8"></script>
+    <script language="JavaScript">
+        // Seccion de Utilidades
+        //------------------------------------------------------------------------------------------------
+        // Funcion que sirve para exportar a excel
+        function fnExcelReport() {
+            var pantalla = document.createElement("a");
+            pantalla.setAttribute("id", "link");
+            pantalla.style.display = "none";
+            document.body.appendChild(pantalla);
+            var tab_text = "<table border='2px'><tr bgcolor='#87AFC6'>";
+            var textRange; var j = 0;
+            tab = document.getElementById('myTable'); // id of table
+
+            for (j = 0; j < tab.rows.length; j++) {
+                tab_text = tab_text + tab.rows[j].innerHTML + "</tr>";
+            }
+
+            tab_text = tab_text + "</table>";
+            tab_text = tab_text.replace(/<A[^>]*>|<\/A>/g, "");//remove if u want links in your table
+            tab_text = tab_text.replace(/<img[^>]*>/gi, ""); // remove if u want images in your table
+            tab_text = tab_text.replace(/<input[^>]*>|<\/input>/gi, ""); // reomves input params
+
+            var ua = window.navigator.userAgent;
+            var msie = ua.indexOf("MSIE ");
+
+            if (msie > 0 || !!navigator.userAgent.match(/Trident.*rv\:11\./))      // If Internet Explorer
+            {
+                if (window.navigator.msSaveBlob) {
+                    var blob = new Blob([tab_text], {
+                        type: "application/csv;charset=utf-8;",
+                    });
+                    navigator.msSaveBlob(blob, "ImportadorOBmarcaFoco.txt");
+                }
+            } else {
+                var link = document.getElementById('link'),
+                    nombre = "ImportadorOBmarcaFoco"
+                link.href = 'data:application/vnd.ms-excel;base64,' + window.btoa(tab_text);
+                link.download = nombre;
+                link.click();
+            }
+        }
+
+        //------------------------Terminana las Utilidades-----------------------------------------------//
+
+        var instanceManager = new ActiveXObject(
+            "PwstInstanceManager.InstanceManager"
+        );
+        var PowerStreet = instanceManager.PowerStreet;
+        var oApp = instanceManager.PwstUI;
+        var strM;
+
+        function WriteFile() {
+            var textarea = document.querySelector("#TextAreaCarga");
+            if (textarea.value == "") {
+                PowerStreet.UI.alert("Sin Informacion para procesar");
+            } else {
+                var raiz = unescape(
+                    location.href.substring(
+                        0,
+                        location.href
+                            .substring(0, location.href.length - 1)
+                            .lastIndexOf("/") + 1
+                    )
+                )
+                    .split("file:///")
+                    .join("");
+                //var raiz = "C:/Pwstshared/"
+                var fso, tf, strM, text1;
+                fso = new ActiveXObject("Scripting.FileSystemObject");
+                tf = fso.CreateTextFile(raiz + "ImportadorOBmarcaFoco.txt", true);
+
+                text1 = document.getElementById("TextAreaCarga").innerText;
+                //text1 = text1.replace(/[`~!@#$%^&*()|+\-=?;:'",.<>\{\}\[\]\\\/]/gi, '');
+                tf.WriteLine(text1);
+                tf.Close();
+
+                //Codigo para ejecutar codigo en el servidor
+                var script = PowerStreet.CreateScriptingProcess();
+                var o = document.getElementById("elScript2");
+                script.AddCode("JScript", o.innerHTML);
+                script.Request.AddFile("elarchivo", raiz + "ImportadorOBmarcaFoco.txt");
+                if (script.Run("ejecutar")) {
+                    strM = "";
+                    document.getElementById("TextAreaLog").value =
+                        strM +
+                        " " +
+                        "\n" +
+                        "\n" +
+                        String(script.Response.GetVariable("Msj", ""));
+                    PowerStreet.UI.Alert("IMPORTACION FINALIZADA");
+                }
+                oApp.managepwsterrors();
+            }
+        }
+    </script>
+
+    <script id="elScript2">
+
+var JSON;
+        if (!JSON) {
+            JSON = {};
+        }
+        JSON.stringify = JSON.stringify || function (obj) {
+
+            var t = typeof (obj);
+            if (t != "object" || obj === null) {
+
+                if (t == "string") obj = '"' + obj + '"';
+                return String(obj);
+
+            } else {
+
+                var n, v, json = [],
+                    arr = (obj && obj.constructor == Array);
+
+                for (n in obj) {
+                    v = obj[n];
+                    t = typeof (v);
+
+                    if (t == "string") v = '"' + v + '"';
+                    else if (t == "object" && v !== null) v = JSON.stringify(v);
+
+                    json.push((arr ? "" : '"' + n + '":') + String(v));
+                }
+
+                return (arr ? "[" : "{") + String(json) + (arr ? "]" : "}");
+            }
+        };
+
+        JSON.parse = JSON.parse || function (str) {
+            if (str === "") str = '""';
+            eval("var p=" + str + ";");
+            return p;
+        };
+        var strM = "";
+        
+        function ejecutar(PowerStreet, ObjProcess) {
+            //Polyfill para hacer funcionar el metodo  Trim()
+            if (typeof String.prototype.trim !== "function") {
+                String.prototype.trim = function () {
+                    return this.replace(/^\s+|\s+$/g, "");
+                };
+            }
+
+            var FSO;
+            var fileExist, file, datTex, datTexCount, datTexvalidation;
+            var numC, arrLinearrColEnc, arrCol;
+            
+            FSO = new ActiveXObject("Scripting.FileSystemObject");
+            file = ObjProcess.Request.GetFile("elarchivo");
+            datTex = FSO.OpenTextFile(file);
+            
+            strM += "INICIO DE IMPORTACION" + "\n";
+
+            datTexCount = FSO.OpenTextFile(file);
+            var numC = datTexCount.ReadAll();
+            var NumFil = numC.split("\n");
+            var num = NumFil.length - 1;
+            datTexCount.close();
+
+            arrLine = datTex.readLine();
+            arrColEnc = arrLine.split("\t");
+            var totCol = arrColEnc.length;
+            var arrData = [];
+            var conteo = 0;
+			var elementosNoEncontrados = [];
+			var elementosEncontrados = [];
+			var elementosAValidar = ["codigo familia", "activo", "vendedor"];
+				
+            for (u = 0; u < totCol; u++) {
+            	var atributo = arrColEnc[u].toLowerCase().trim();
+				var encontrado = false;
+				
+				for (var j = 0; j < elementosAValidar.length; j++) {
+					if (elementosAValidar[j] === atributo) {
+						elementosEncontrados.push(atributo);
+						encontrado = true;
+						break;
+					}
+				}
+				
+				if (!encontrado) {
+					elementosNoEncontrados.push(atributo);
+				}
+										
+            }
+            
+			if (elementosNoEncontrados.length === 0) {
+				var elementosFaltantes = [];
+				for (var k = 0; k < elementosAValidar.length; k++) {
+					var elementoFaltante = true;
+					for (var l = 0; l < elementosEncontrados.length; l++) {
+						if (elementosAValidar[k] === elementosEncontrados[l]) {
+							elementoFaltante = false;
+							break;
+						}
+					}
+					if (elementoFaltante) {
+						elementosFaltantes.push(elementosAValidar[k]);
+					}
+				}
+				
+				if (elementosFaltantes.length === 0) {
+					
+					for (a = 0; a < totCol; a++) {
+		                
+	                    // Se recorre la primera fila
+	                    while (!datTex.AtEndOfStream) {
+	                        arrLine = datTex.readLine();
+	                        arrCol = arrLine.split("\t");
+	                        if (arrCol.length == totCol) {
+	                            var objData = new Object();
+	                            for (c = 0; c < arrCol.length; c++) {
+	                                var dato = arrCol[c];
+	                                if (dato != "") {
+	                                    swtAtributos(arrColEnc[c].toLowerCase(), dato, objData);
+	                                }
+	                            }
+	                            arrData.push(objData);
+	                        } else {
+	                            strM += "\t" + "\t" + "ERROR: Linea no procesada " + "\n" + arrCol + "\n";
+	                        }
+	                    }
+		            }
+	            
+	            	modificarFecha(arrData, PowerStreet);
+	            	
+				} else {
+					strM += "Elementos que faltan: " + elementosFaltantes.join(", ");
+				}
+	            
+			} else {
+				strM += "Los siguientes elementos no existen: " + elementosNoEncontrados.join(", ");
+			}
+            
+            ObjProcess.Response.SetVariable("Msj", strM);
+        
+        }
+
+        function swtAtributos(atr, dat, objData) {
+        	switch (atr) {
+				case "codigo familia":
+					objData.codfamilia = dat;
+					break;
+				case "activo":
+					objData.activo = dat;
+					break;
+				case "vendedor":
+					objData.vendedor = dat;
+					break;
+				default:
+					strM += "\t" + "\t" + "Atributo no Existe: " + atr + " : " + dat + "\n";
+					break;
+			}
+		}
+
+        function modificarFecha(arrData, PowerStreet) {
+            var num = arrData.length;
+            var i = 1;
+            var LRUT;
+            var PWST = new ActiveXObject("PowerStreet.Aplicacion");
+            var ColRutas = PWST.NuevaColeccion();
+            
+            PowerStreet.UI.ProgressInit("myProgressID", "procesando...", num);
+            var txtsql = ""
+			txtsql += " if object_id('dbo.tabla_ob_marca_foco') is null create table dbo.tabla_ob_marca_foco(marca char(4) NOT NULL, activo int NOT NULL, vendedor char(4)NOT NULL, PRIMARY KEY (marca, vendedor)); "
+			txtsql += " if object_id('tempdb..#auxtabla_ob_marca_foco') is not null drop table #auxtabla_ob_marca_foco;	"		
+			txtsql += " create table #auxtabla_ob_marca_foco(marca char(4) NOT NULL, activo int  NOT NULL, vendedor char(4)NOT NULL);  "
+            
+            strM += "------------------------------" + "\n"
+			strM += "Hora Inicio: " + Hoy(1) + "\n" + "\n";
+            
+            for (var index = 0; index < num; index++) {
+				var obj = arrData[index];
+				var txt = "";
+				
+				txt = validarfamiliavendedor(obj, PowerStreet)
+				strM += JSON.stringify(obj)  + "\n"	
+
+				
+                if(txt === "true"){
+                	txtsql += " insert #auxtabla_ob_marca_foco select '" + obj.codfamilia + "'," + obj.activo + ",'" + obj.vendedor + "'";
+                	strM += "Se cargo correctamente la informacion" + "\n";
+                	// strM += txtsql;
+                } else {
+                	strM += txt;
+                	strM += "No se cargo correctamente la informacion" + "\n";
+                }
+                
+                PowerStreet.UI.ProgressUpdate(
+                    "myProgressID",
+                    "procesando..." + i + " de " + num,
+                    i++
+                );
+                
+            }
+            
+            txtsql += " insert into dbo.tabla_ob_marca_foco "
+			txtsql += " select "
+			txtsql += " 	a.marca "
+			txtsql += " 	, a.activo "
+			txtsql += " 	, a.vendedor "
+			txtsql += " from "
+			txtsql += " 	#auxtabla_ob_marca_foco a " 
+			txtsql += " 	left join dbo.tabla_ob_marca_foco b on b.marca=a.marca and b.vendedor = a.vendedor "
+			txtsql += " where "
+			txtsql += " 	b.marca is null ; "
+			
+			txtsql += " update a "
+			txtsql += " 	set "
+			txtsql += " 	activo = b.activo "
+			txtsql += " from "
+			txtsql += " 	dbo.tabla_ob_marca_foco a "
+			txtsql += " 	join #auxtabla_ob_marca_foco b on b.marca=a.marca and b.vendedor = a.vendedor ; "
+            
+            PowerStreet.Execstring(txtsql)
+            
+            PowerStreet.UI.ProgressDestroy("myProgressID");
+        }
+
+        function lisError(PowerStreet) {
+            var txt = "";
+            var listaErr = PowerStreet.Errores.ListarErrores;
+            for (var i = 1; i <= listaErr.Count(); i++) {
+                txt = txt + listaErr.item(i).Descripcion + "  ";
+            }
+
+            return txt;
+        }
+
+        function PwstErrores(PowerStreet) {
+            var txt = " ";
+            var texto = " ";
+            var listaErr = PowerStreet.Errores;
+
+            for (var i = 1; i <= listaErr.Count(); i++) {
+                texto = texto + listaErr.item(i).Descripcion + "  ";
+                var temporal = document.createElement("div");
+                temporal.innerHTML = texto;
+                txt = temporal.textContent || temporal.innerText || "";
+            }
+
+            if (txt.length > 1) {
+                return txt;
+            }
+
+            return txt;
+        }
+        
+        function Hoy(hora) {
+			var partFecha, fcFecha, fcTime;
+			fcTime = " ";
+			partFecha = new Date();
+			var dd = partFecha.getDate();
+			var mm = partFecha.getMonth() + 1; //January is 0!
+			var yyyy = partFecha.getFullYear();
+
+			if (dd < 10) dd = '0' + dd;
+			if (mm < 10) mm = '0' + mm;
+
+			if (hora == 1) {
+				var hh = partFecha.getHours()-3;
+				var min = partFecha.getMinutes();
+				var ss = partFecha.getSeconds();
+				if (hh < 10) hh = '0' + hh;
+				if (min < 10) min = '0' + min;
+				if (ss < 10) ss = '0' + ss;
+				fcTime = " " + hh + ':' + min + ':' + ss
+			}
+
+			fcFecha = dd + '-' + mm + '-' + yyyy + fcTime;
+			return fcFecha;
+		}
+
+		
+		
+		function validarfamiliavendedor(obj, PowerStreet) {
+			var vendedor = obj.vendedor;
+			var familia = obj.codfamilia;
+			var activo = obj.activo;
+
+			var txt = "";
+			
+			if(txt == "" && vendedor != undefined && familia != undefined && activo != undefined ){
+				
+				vet = PowerStreet.Vendedores.Buscar(vendedor)
+				fam = PowerStreet.Familias.Buscar(familia)	
+				
+                if(vet)	{
+                    txt = ""
+                        if(fam) {
+                            txt = ""
+                                 if(activo == 0 || activo == 1){
+
+                                         txt = ""
+                                 } else {
+                                     txt += "Ingrese informacion valida en la columna activo, tiene que ser 1 o 0 " + "\n" 
+                                 }
+                                
+                                } else {
+                                    
+                                    txt += "Codigo Familia no existe en la base ." + familia + "\n"   
+                                }
+                    } else {
+                    
+                        txt += "Vendedor no existe en la base ." + vendedor + "\n"  
+                    }
+			} else {
+                    
+                    txt += "Revisar si no se dejan columnas vacias " + "\n" 
+                }
+			
+			if(txt == ""){
+				return "true"
+			} else {
+				return txt
+			}
+
+		}
+        
+    </script>
+</body>
+
+</html>
