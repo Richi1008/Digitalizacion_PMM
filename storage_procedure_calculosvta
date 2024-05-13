@@ -1,0 +1,558 @@
+
+IF EXISTS (SELECT * FROM sysobjects WHERE type = 'P' AND name = 'sp_asignacion_obj_peso_clientes_esc_a') DROP Procedure sp_asignacion_obj_peso_clientes_esc_a;
+
+create procedure [dbo].[sp_asignacion_obj_peso_clientes_esc_a]
+
+as
+
+
+--- borrado de tablas auxiliares 
+
+
+IF (OBJECT_ID('tempdb..#auxcuentastransac')) IS NOT NULL DROP TABLE #auxcuentastransac
+IF (OBJECT_ID('tempdb..#totalizado')) IS NOT NULL DROP TABLE #totalizado
+IF (OBJECT_ID('tempdb..#obmesclientepeso')) IS NOT NULL DROP TABLE #obmesclientepeso
+IF (OBJECT_ID('tempdb..#auxobjetivocclientesuc')) IS NOT NULL DROP TABLE #auxobjetivocclientesuc
+IF (OBJECT_ID('tempdb..#auxcuentaarti')) IS NOT NULL DROP TABLE #auxcuentaarti
+IF (OBJECT_ID('tempdb..#visitasefectivas')) IS NOT NULL DROP TABLE #visitasefectivas
+IF (OBJECT_ID('tempdb..#totalizadoarti')) IS NOT NULL DROP TABLE #totalizadoarti
+IF (OBJECT_ID('tempdb..#transaccionaxarticulo')) IS NOT NULL DROP TABLE #transaccionaxarticulo
+IF (OBJECT_ID('tempdb..#periodoactual')) IS NOT NULL DROP TABLE #periodoactual
+IF (OBJECT_ID('tempdb..#auxobjetivocargado')) IS NOT NULL DROP TABLE #auxobjetivocargado
+IF (OBJECT_ID('tempdb..#auxobjetivocargadosubmarca')) IS NOT NULL DROP TABLE #auxobjetivocargadosubmarca
+IF (OBJECT_ID('tempdb..#auxobjetivocargadosubmarca')) IS NOT NULL DROP TABLE #auxobjetivocargadomarca
+IF (OBJECT_ID('tempdb..#promediovisita')) IS NOT NULL DROP TABLE #promediovisita
+IF (OBJECT_ID('tempdb..#finalpromediovisita')) IS NOT NULL DROP TABLE #finalpromediovisita
+IF (OBJECT_ID('tempdb..#auxfinalpromvisita')) IS NOT NULL DROP TABLE #auxfinalpromvisita
+IF (OBJECT_ID('tempdb..#mespmi')) IS NOT NULL DROP TABLE #mespmi
+IF (OBJECT_ID('tempdb..#visitamesactual')) IS NOT NULL DROP TABLE #visitamesactual
+IF (OBJECT_ID('tempdb..#visitamesactual')) IS NOT NULL DROP TABLE #ventasmesactual
+IF (OBJECT_ID('tempdb..#calculosugeridocuenta')) IS NOT NULL DROP TABLE #calculosugeridocuenta
+IF (OBJECT_ID('tempdb..#calculosugecluentavisita')) IS NOT NULL DROP TABLE #calculosugecluentavisita
+IF (OBJECT_ID('tempdb..#auxobjetivosuc')) IS NOT NULL DROP TABLE #auxobjetivosuc
+IF (OBJECT_ID('tempdb..#asignacionobafiliada')) IS NOT NULL DROP TABLE #asignacionobafiliada
+IF (OBJECT_ID('tempdb..#mespmix3')) IS NOT NULL DROP TABLE #mespmix3
+
+/*
+Select mes ,convert(char(10),min(fecha),103) desdefecha ,convert(char(10),max(fecha),103) hastafecha
+into #mespmi	
+from calendarioventamensual 
+where mes =(Select mes from calendarioventamensual where cast(fecha as date)= cast(getdate()as date))  -- cast((rtrim(datepart(month, (Select mes from calendarioventamensual where cast(fecha as date)= cast(getdate()as date))))) as numeric(2)) 
+group by mes
+
+
+Select distinct
+cast((rtrim(datepart(year, fecha))+rtrim(mes)) as numeric(6))periodo_actual
+into #periodoactual 
+from calendarioventamensual 
+where mes =(Select mes from calendarioventamensual where cast(fecha as date)= cast(getdate() as date)) 
+
+
+Select  convert(char(10),min(fecha),103) desdefecha ,convert(char(10),max(fecha),103) hastafecha
+into #mespmix3	
+from calendarioventamensual 
+where mes between  (datepart(month, GETDATE())-3) and (datepart(month, GETDATE())-1)
+*/
+Select mes ,convert(char(10),min(fecha),103) desdefecha ,convert(char(10),max(fecha),103) hastafecha
+into #mespmi	
+from calendarioventamensual 
+where mes =(Select mes from calendarioventamensual where cast(fecha as date)= cast(getdate()as date))  -- cast((rtrim(datepart(month, (Select mes from calendarioventamensual where cast(fecha as date)= cast(getdate()as date))))) as numeric(2)) 
+and datepart(year, fecha) = datepart(year, getdate())
+group by mes
+
+
+Select distinct
+cast((rtrim(datepart(year, fecha))+RIGHT(rtrim('0')+rtrim(mes),2)) as numeric(6))periodo_actual
+into #periodoactual 
+from calendarioventamensual 
+where mes =(Select mes from calendarioventamensual where cast(fecha as date)= cast(getdate() as date)) 
+and datepart(year, fecha) = datepart(year, getdate())
+
+
+
+Select  convert(char(10),min(fecha),103) desdefecha ,convert(char(10),max(fecha),103) hastafecha
+into #mespmix3	
+from calendarioventamensual 
+where (mes between (datepart(month, (DATEADD(MONTH, -3, GETDATE())))) and (datepart(month, (DATEADD(MONTH, -3, GETDATE())))) and datepart(year, fecha) =  (datepart(year, (DATEADD(MONTH, -3, GETDATE())))) )
+or (mes BETWEEN (datepart(month, (DATEADD(MONTH, -1, GETDATE())))) AND (datepart(month, (DATEADD(MONTH, -1, GETDATE())))) and  datepart(year, fecha) = (datepart(year, (DATEADD(MONTH, -1, GETDATE())))) )
+
+
+	Select  
+		periodo 
+		,afiliada
+		,codigo_cliente cuenta
+		,ob.sucursal sucursal
+		into #auxobjetivocargado
+	from objetivoobclientes ob
+	join #periodoactual pa on pa.periodo_actual = ob.periodo
+	where  Ob_cliente != 0 
+	
+	
+	group by 		
+		periodo ,afiliada ,codigo_cliente ,sucursal 
+		
+	order by codigo_cliente
+	
+	
+	
+	Select  
+		periodo 
+		,afiliada
+		,codigo_cliente cuenta
+		,ob.sucursal sucursal
+		,Cod_submarca submarca
+	  into #auxobjetivocargadosubmarca
+	from objetivoobclientes ob
+	join #periodoactual pa on pa.periodo_actual = ob.periodo
+	where   ob_submarca != 0 
+	
+	group by 		
+		periodo ,afiliada ,codigo_cliente ,sucursal, cod_submarca
+		
+	order by codigo_cliente
+
+
+	
+	
+	Select  
+		periodo 
+		,afiliada
+		,codigo_cliente cuenta
+		,ob.sucursal sucursal
+		,marca 
+	  into #auxobjetivocargadomarca
+	from objetivoobclientes ob
+	join #periodoactual pa on pa.periodo_actual = ob.periodo
+	where  ob_marca != 0
+	
+	
+	group by 		
+		periodo ,afiliada ,codigo_cliente ,sucursal, marca
+		
+	order by codigo_cliente
+		
+	
+
+
+Select
+	do.cuenta
+	,do.sucursal
+	,sum(da.cantidad*td.indiventa) totalventa
+	--,count(distinct rtrim(do.fecha)+rtrim(do.sucursal)+rtrim(do.cuenta)) Visitas_Efectivas
+ into #auxcuentastransac
+from documentos do with(nolock) 
+join docarti da with(nolock) on do.empresa=da.empresa and do.clavecorr = da.clavecorr and do.serie = da.serie and do.nrodoc = da.nrodoc
+join tipodoc td with(nolock) on td.codigo = do.tipodocum 
+join cuentas cu with(nolock) on cu.codigo = do.cuenta and do.tipocuenta = cu.tipocuenta
+join calendarioventamensual ca with(nolock) on cast(ca.fecha as date) = cast(do.fecha as date)
+join articulo ar  with(nolock) on ar.codigo = da.articulo
+join #mespmix3 mp on 1=1
+left join #auxobjetivocargado obc on obc.cuenta = do.cuenta and obc.sucursal = do.sucursal 
+where 
+	do.fecha between mp.desdefecha and mp.hastafecha
+	and td.venta>1
+	and do.anulado = 0
+	and cu.inactivo = 0 
+	and cu.tipocuenta=1
+	and ca.laborable = 1 
+	and do.clavecorr in ('FA','NC')
+	and obc.cuenta is null
+	and NOT EXISTS (select 1 from #auxobjetivocargadosubmarca sm where do.cuenta=sm.cuenta and do.sucursal = sm.sucursal and ar.tipoproducto = sm.submarca )
+	and NOT EXISTS (select 1 from #auxobjetivocargadomarca sm where do.cuenta=sm.cuenta and do.sucursal = sm.sucursal and ar.familia = sm.marca )
+group by 
+	do.cuenta, do.sucursal
+having sum(da.cantidad*td.indiventa)>0
+
+
+
+
+
+Select  
+	
+	sum(totalventa)totalizado
+	into #totalizado	
+ from  #auxcuentastransac
+
+
+
+Select 
+
+	tra.cuenta
+	,tra.sucursal
+	,cu.empresa
+	--,sum(tra.totalventa/tra.Visitas_Efectivas) promedio
+	,sum((tra.totalventa/tot.totalizado))participacion
+
+	into #obmesclientepeso
+From #auxcuentastransac tra
+join #totalizado tot on 1=1
+join cuentas cu on cu.codigo = tra.cuenta and  cu.tipocuenta=1
+
+group by 
+	tra.cuenta, tra.sucursal, cu.empresa
+
+
+
+
+Select   
+    ob.periodo
+	,obj.cuenta
+	,obj.sucursal
+	,sum(ob.ob_afiliada*obj.participacion)objcliente
+ into #auxobjetivocclientesuc
+ from #obmesclientepeso obj
+join objetivoobclientes ob on ob.afiliada = obj.empresa
+join #periodoactual pa on pa.periodo_actual = ob.periodo
+
+where ob_afiliada != 0 
+
+group by 
+	    ob.periodo, obj.cuenta ,obj.sucursal 
+
+
+Select cuenta, sucursal into #auxobjetivosuc  from #auxobjetivocclientesuc group by cuenta, sucursal
+
+Select  
+
+	do.cuenta
+	,do.sucursal
+	,ar.tipoproducto
+	,sum(da.cantidad*td.indiventa) totalventa	
+ into #auxcuentaarti
+from documentos do with(nolock) 
+join docarti da with(nolock)  on do.empresa=da.empresa and do.clavecorr = da.clavecorr and do.serie = da.serie and do.nrodoc = da.nrodoc
+join #auxobjetivosuc axob on axob.cuenta=do.cuenta and axob.sucursal = do.sucursal
+join tipodoc td with(nolock) on td.codigo = do.tipodocum 
+join cuentas cu with(nolock)  on cu.codigo = do.cuenta and do.tipocuenta = cu.tipocuenta
+join articulo ar  with(nolock) on ar.codigo = da.articulo
+join calendarioventamensual ca with(nolock) on cast(ca.fecha as date) = cast(do.fecha as date)
+join #mespmix3 mp on 1=1 
+where 
+	--do.fecha between DATEADD(MONTH, DATEDIFF(MONTH, 0, GETDATE()) - 3, 0) and DATEADD(DAY, -1, DATEADD(MONTH, DATEDIFF(MONTH, 0, GETDATE()), 0))
+	do.fecha between mp.desdefecha and mp.hastafecha
+	and td.venta>1
+	and do.anulado = 0
+	and cu.inactivo = 0 
+	and cu.tipocuenta=1
+	and ca.laborable = 1 
+	and do.clavecorr in ('FA','NC')
+	and NOT EXISTS (select 1 from #auxobjetivocargadosubmarca sm where do.cuenta=sm.cuenta and do.sucursal = sm.sucursal and ar.tipoproducto = sm.submarca )
+	and NOT EXISTS (select 1 from #auxobjetivocargadomarca sm where do.cuenta=sm.cuenta and do.sucursal = sm.sucursal and ar.familia = sm.marca )
+	
+
+group by 
+	do.cuenta, do.sucursal, ar.tipoproducto
+	having sum(da.cantidad*td.indiventa)>0
+	
+order by 
+	do.cuenta, do.sucursal, ar.tipoproducto
+
+
+/*
+Select  
+	 cuenta
+	,sucursal
+	,sum(Visitas_Efectivas)Visitas_Efectivas 
+
+ into #visitasefectivas
+
+from #auxcuentastransac
+group by 	 
+	cuenta, sucursal
+*/
+
+	
+Select  
+	cuenta, sucursal, --tipoproducto,
+	sum(totalventa)totalizado
+	into #totalizadoarti	
+	
+ from  #auxcuentaarti
+ 
+ group by cuenta, sucursal--, tipoproducto
+
+
+
+
+Select  
+	tot.cuenta
+	,tot.sucursal
+	,tot.tipoproducto	
+	,sum(tot.totalventa)totalventa
+	--,sum(tot.totalventa/vi.Visitas_Efectivas)promedio
+	,sum(tot.totalventa/atr.totalizado)participacion
+ into #transaccionaxarticulo	
+from #auxcuentaarti tot
+--join #visitasefectivas vi on vi.cuenta=tot.cuenta and vi.sucursal=tot.sucursal
+join #totalizadoarti atr on atr.cuenta=tot.cuenta and atr.sucursal=tot.sucursal  --and atr.tipoproducto=tot.tipoproducto
+
+group by 
+	tot.cuenta, tot.sucursal, tot.tipoproducto	
+
+
+
+
+Select 
+ do.cuenta
+,do.sucursal
+,count(distinct rtrim(do.cuenta)+rtrim(do.sucursal)+rtrim(do.fecha))cuantos
+
+into #promediovisita
+from documentos do with(nolock)  
+join librorut lb on lb.cuenta = do.cuenta  and do.sucursal = lb.sucursal and do.tipocuenta = lb.tipocuenta
+join cuentas cu with(nolock) on do.cuenta = cu.codigo and do.tipocuenta = cu.tipocuenta
+join #auxobjetivocclientesuc axob on axob.cuenta=do.cuenta and axob.sucursal = do.sucursal
+join calendarioventamensual ca with(nolock) on cast(ca.fecha as date) = cast(do.fecha as date)
+join #mespmix3 mp on 1=1
+where 
+--do.fecha between DATEADD(MONTH, DATEDIFF(MONTH, 0, GETDATE()) - 3, 0)  and DATEADD(DAY, -1, DATEADD(MONTH, DATEDIFF(MONTH, 0, GETDATE()), 0))
+do.fecha between mp.desdefecha and mp.hastafecha
+and do.tipodocum = 'VIN'
+and do.anulado = 0
+and do.tipocuenta = 1
+and cu.inactivo = 0
+and lb.ruta != '99'
+and do.ruta != '99'
+and ca.laborable = 1
+
+group by  
+ do.cuenta
+,do.sucursal
+
+order by  do.cuenta
+,do.sucursal
+
+
+
+
+Select cuenta, sucursal,  convert (numeric(12,3),sum(cuantos/3.000))visitaspromedio -- case when convert (numeric(12,3),sum(cuantos/3.000))< 1 then 1 else convert (numeric(12,3),sum(cuantos/3)) end cuantos 
+into #finalpromediovisita 
+from #promediovisita 
+group by cuenta, sucursal order by cuenta, sucursal
+
+
+
+
+Select  cuenta, sucursal,  convert (numeric(12),sum(visitaspromedio)) promediovisita 
+into #auxfinalpromvisita
+from #finalpromediovisita 
+group by cuenta, sucursal order by cuenta, sucursal
+
+
+
+
+
+Select 
+ do.cuenta
+,do.sucursal
+,count(distinct rtrim(do.cuenta)+rtrim(do.sucursal)+rtrim(do.fecha))visitas
+into #visitamesactual
+from documentos do with(nolock)  
+join librorut lb on lb.cuenta = do.cuenta  and do.sucursal = lb.sucursal and do.tipocuenta = lb.tipocuenta
+join cuentas cu with(nolock) on do.cuenta = cu.codigo and do.tipocuenta = cu.tipocuenta
+join #auxobjetivocclientesuc axob on axob.cuenta=do.cuenta and axob.sucursal = do.sucursal
+join calendarioventamensual ca with(nolock) on cast(ca.fecha as date) = cast(do.fecha as date)
+join #mespmi mpm on  cast (ca.mes as numeric(2)) = cast (mpm.mes as numeric(2))
+
+where do.fecha between mpm.desdefecha and mpm.hastafecha
+and do.tipodocum = 'VIN'
+and do.anulado = 0
+and do.tipocuenta = 1
+and cu.inactivo = 0
+and lb.ruta != '99'
+and do.ruta != '99'
+and ca.laborable = 1 
+
+group by  
+ do.cuenta
+,do.sucursal
+
+order by  do.cuenta
+,do.sucursal
+
+
+
+Select  
+
+	do.cuenta
+	,do.sucursal
+	,ar.tipoproducto
+	,sum(da.cantidad*td.indiventa) totalventaactual	
+ into #ventasmesactual
+from documentos do with(nolock) 
+join docarti da with(nolock)  on do.empresa=da.empresa and do.clavecorr = da.clavecorr and do.serie = da.serie and do.nrodoc = da.nrodoc
+join #auxobjetivosuc axob on axob.cuenta=do.cuenta and axob.sucursal = do.sucursal
+join tipodoc td with(nolock) on td.codigo = do.tipodocum 
+join cuentas cu with(nolock)  on cu.codigo = do.cuenta and do.tipocuenta = cu.tipocuenta
+join articulo ar  with(nolock) on ar.codigo = da.articulo
+join calendarioventamensual ca with(nolock) on cast(ca.fecha as date) = cast(do.fecha as date)
+join #mespmi mpm on  cast (ca.mes as numeric(2)) = cast (mpm.mes as numeric(2))
+where 
+	 do.fecha between mpm.desdefecha and mpm.hastafecha
+	and td.venta>1
+	and do.anulado = 0
+	and cu.inactivo = 0 
+	and cu.tipocuenta=1
+	and ca.laborable = 1 
+	and do.clavecorr in ('FA','NC')
+	and NOT EXISTS (select 1 from #auxobjetivocargadosubmarca sm where do.cuenta=sm.cuenta and do.sucursal = sm.sucursal and ar.tipoproducto = sm.submarca )
+	and NOT EXISTS (select 1 from #auxobjetivocargadomarca sm where do.cuenta=sm.cuenta and do.sucursal = sm.sucursal and ar.familia = sm.marca )
+	
+
+group by 
+	do.cuenta, do.sucursal, ar.tipoproducto
+	having sum(da.cantidad*td.indiventa)>0
+	
+order by 
+	do.cuenta, do.sucursal, ar.tipoproducto
+
+
+
+
+	Select
+		suc.periodo
+		,tras.cuenta
+		,tras.sucursal
+		,tras.tipoproducto
+		,sum(suc.objcliente*tras.participacion)sugeridoobcliente
+		into #asignacionobafiliada
+	From #auxobjetivocclientesuc suc
+	join #transaccionaxarticulo tras on suc.cuenta=tras.cuenta and suc.sucursal=tras.sucursal
+	
+group by 
+	suc.periodo, tras.cuenta, tras.sucursal, tras.tipoproducto	
+
+
+
+Select  
+	suc.cuenta
+	,suc.sucursal
+	,suc.tipoproducto
+	,convert(numeric(12),sum(distinct suc.sugeridoobcliente))objcliente
+	,isnull(sum(distinct case when pv.promediovisita < 1 then 1 else pv.promediovisita end ),1)promediovisita
+	,isnull(sum(distinct va.visitas),0)visitasactuales
+	,isnull(sum( vm.totalventaactual),0)MTD
+ into #calculosugecluentavisita
+From #asignacionobafiliada suc
+	left join #auxfinalpromvisita pv on pv.cuenta = suc.cuenta and pv.sucursal=suc.sucursal
+	left join #visitamesactual va on va.cuenta = suc.cuenta and va.sucursal=suc.sucursal
+	left join #ventasmesactual vm on vm.cuenta = suc.cuenta and vm.sucursal=suc.sucursal and vm.tipoproducto = suc.tipoproducto
+group by 
+	suc.cuenta, suc.sucursal, suc.tipoproducto
+
+
+
+
+if object_id('dbo.asignacion_obj_x_peso_x_clientes_a') is null 
+	create table dbo.asignacion_obj_x_peso_x_clientes_a
+	(cliente char(10) not null
+	,sucursal int not null
+	,tipoproducto char(20)
+	,sugeridoobcliente numeric (12))
+
+delete from asignacion_obj_x_peso_x_clientes_a
+
+insert into asignacion_obj_x_peso_x_clientes_a
+
+Select 
+	cuenta
+	,sucursal
+	,tipoproducto
+	,sum (case when (promediovisita-visitasactuales)<=0 then ((objcliente-MTD)/(1))  else ((objcliente-MTD)/(promediovisita-visitasactuales)) end )as sugerido 
+
+from #calculosugecluentavisita
+group by 
+	cuenta, sucursal, tipoproducto
+
+
+
+if object_id('tempdb..#auxtabla_obj_x_peso_x_clientes_historico') is not null drop table #auxtabla_obj_x_peso_x_clientes_historico 
+	create table #auxtabla_obj_x_peso_x_clientes_historico
+	( periodo numeric(6) not null
+	,cliente char(10) not null
+	,sucursal int not null
+	,tipoproducto char(20)
+	,sugeridoobcliente numeric (12))
+	
+
+if object_id('dbo.asignacion_obj_x_peso_x_clientes_historico') is null
+
+create table dbo.asignacion_obj_x_peso_x_clientes_historico
+	( periodo numeric(6) not null
+	,cliente char(10) not null
+	,sucursal int not null
+	,tipoproducto char(20)
+	,sugeridoobcliente numeric (12),
+	primary key (periodo, cliente, sucursal, tipoproducto ) )	
+	
+
+insert into #auxtabla_obj_x_peso_x_clientes_historico
+
+	Select
+		suc.periodo
+		,tras.cuenta
+		,tras.sucursal
+		,tras.tipoproducto
+		,sum(suc.objcliente*tras.participacion)sugeridoobcliente
+	From #auxobjetivocclientesuc suc
+	join #transaccionaxarticulo tras on suc.cuenta=tras.cuenta and suc.sucursal=tras.sucursal
+	
+group by 
+	suc.periodo, tras.cuenta, tras.sucursal, tras.tipoproducto	
+	
+
+	
+insert into asignacion_obj_x_peso_x_clientes_historico
+Select  
+		 obc.periodo
+		,obc.cliente
+		,obc.sucursal
+		,obc.tipoproducto
+		,sum(obc.sugeridoobcliente)sugeridoobcliente
+
+from #auxtabla_obj_x_peso_x_clientes_historico obc
+left join asignacion_obj_x_peso_x_clientes_historico ah with(nolock) on ah.periodo = obc.periodo and ah.cliente = obc.cliente and ah.sucursal = obc.sucursal and ah.tipoproducto = obc.tipoproducto 
+
+where ah.cliente is null
+
+group by 
+	obc.periodo, obc.cliente, obc.sucursal, obc.tipoproducto	
+
+	
+update a 
+	set 
+		a.sugeridoobcliente = b.sugeridoobcliente		
+from 
+ 	asignacion_obj_x_peso_x_clientes_historico a
+join #auxtabla_obj_x_peso_x_clientes_historico b with(nolock) on b.periodo = a.periodo and b.cliente = a.cliente and b.sucursal = a.sucursal and b.tipoproducto = a.tipoproducto
+
+;
+
+--Select * from asignacion_obj_x_peso_x_clientes_a
+
+IF (OBJECT_ID('tempdb..#auxcuentastransac')) IS NOT NULL DROP TABLE #auxcuentastransac
+IF (OBJECT_ID('tempdb..#totalizado')) IS NOT NULL DROP TABLE #totalizado
+IF (OBJECT_ID('tempdb..#obmesclientepeso')) IS NOT NULL DROP TABLE #obmesclientepeso
+IF (OBJECT_ID('tempdb..#auxobjetivocclientesuc')) IS NOT NULL DROP TABLE #auxobjetivocclientesuc
+IF (OBJECT_ID('tempdb..#auxcuentaarti')) IS NOT NULL DROP TABLE #auxcuentaarti
+IF (OBJECT_ID('tempdb..#visitasefectivas')) IS NOT NULL DROP TABLE #visitasefectivas
+IF (OBJECT_ID('tempdb..#totalizadoarti')) IS NOT NULL DROP TABLE #totalizadoarti
+IF (OBJECT_ID('tempdb..#transaccionaxarticulo')) IS NOT NULL DROP TABLE #transaccionaxarticulo
+IF (OBJECT_ID('tempdb..#periodoactual')) IS NOT NULL DROP TABLE #periodoactual
+IF (OBJECT_ID('tempdb..#auxobjetivocargado')) IS NOT NULL DROP TABLE #auxobjetivocargado
+IF (OBJECT_ID('tempdb..#auxobjetivocargadosubmarca')) IS NOT NULL DROP TABLE #auxobjetivocargadosubmarca
+IF (OBJECT_ID('tempdb..#auxobjetivocargadosubmarca')) IS NOT NULL DROP TABLE #auxobjetivocargadomarca
+IF (OBJECT_ID('tempdb..#promediovisita')) IS NOT NULL DROP TABLE #promediovisita
+IF (OBJECT_ID('tempdb..#finalpromediovisita')) IS NOT NULL DROP TABLE #finalpromediovisita
+IF (OBJECT_ID('tempdb..#auxfinalpromvisita')) IS NOT NULL DROP TABLE #auxfinalpromvisita
+IF (OBJECT_ID('tempdb..#mespmi')) IS NOT NULL DROP TABLE #mespmi
+IF (OBJECT_ID('tempdb..#visitamesactual')) IS NOT NULL DROP TABLE #visitamesactual
+IF (OBJECT_ID('tempdb..#ventasmesactual')) IS NOT NULL DROP TABLE #ventasmesactual
+IF (OBJECT_ID('tempdb..#calculosugeridocuenta')) IS NOT NULL DROP TABLE #calculosugeridocuenta
+IF (OBJECT_ID('tempdb..#calculosugecluentavisita')) IS NOT NULL DROP TABLE #calculosugecluentavisita
+IF (OBJECT_ID('tempdb..#auxobjetivosuc')) IS NOT NULL DROP TABLE #auxobjetivosuc
+IF (OBJECT_ID('tempdb..#asignacionobafiliada')) IS NOT NULL DROP TABLE #asignacionobafiliada
+IF (OBJECT_ID('tempdb..#mespmix3')) IS NOT NULL DROP TABLE #mespmix3
+
+SELECT name FROM sysobjects WHERE type = 'P' AND name = 'sp_asignacion_obj_peso_clientes_esc_a';
+
