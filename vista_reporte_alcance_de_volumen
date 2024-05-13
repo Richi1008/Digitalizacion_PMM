@@ -1,0 +1,390 @@
+IF (OBJECT_ID('tempdb..#periodoactual')) IS NOT NULL DROP TABLE #periodoactual;
+				IF (OBJECT_ID('tempdb..#auxobjetivoobclientes')) IS NOT NULL DROP TABLE #auxobjetivoobclientes;
+				IF (OBJECT_ID('tempdb..#auxobjetivoclientesubmarca')) IS NOT NULL DROP TABLE #auxobjetivoclientesubmarca;
+				IF (OBJECT_ID('tempdb..#auxobjetivocliente')) IS NOT NULL DROP TABLE #auxobjetivocliente;
+				IF (OBJECT_ID('tempdb..#auxobjetivoclientemarca')) IS NOT NULL DROP TABLE #auxobjetivoclientemarca;
+				IF (OBJECT_ID('tempdb..#objetivoxclientecargado')) IS NOT NULL DROP TABLE #objetivoxclientecargado;
+				IF (OBJECT_ID('tempdb..#auxobjetivoxclientecargado')) IS NOT NULL DROP TABLE #auxobjetivoxclientecargado;
+				IF (OBJECT_ID('tempdb..#cuentastransasinobj')) IS NOT NULL DROP TABLE #cuentastransasinobj;
+				IF (OBJECT_ID('tempdb..#auxvolumenacumulado')) IS NOT NULL DROP TABLE #auxvolumenacumulado;
+				IF (OBJECT_ID('tempdb..#avanceobvolactual')) IS NOT NULL DROP TABLE #avanceobvolactual;
+				IF (OBJECT_ID('tempdb..#objetivo_avance')) IS NOT NULL DROP TABLE #objetivo_avance;
+				IF (OBJECT_ID('tempdb..#primer_calculoobjetivo')) IS NOT NULL DROP TABLE #primer_calculoobjetivo;
+				IF (OBJECT_ID('tempdb..#ultimo_calculoobjetivo')) IS NOT NULL DROP TABLE #ultimo_calculoobjetivo;
+				IF (OBJECT_ID('tempdb..#consultafinal')) IS NOT NULL DROP TABLE #consultafinal;
+				
+				-- obtengo el periodo desde la fecha hasta la fecha
+				Select 
+				(cast((rtrim(datepart(year, @DesdeFecha))+rtrim(datepart(month, @DesdeFecha))) as numeric(6)))desdefecha
+				,(cast((rtrim(datepart(year, @HastaFecha))+rtrim(datepart(month, @HastaFecha))) as numeric(6)))hastafecha
+				
+				into #periodoactual
+				;
+				--- optimizando la consulta  de objetivos
+				Select  periodo, afiliada, codigo_cliente, sucursal , Ob_submarca, Ob_cliente, Ob_marca 
+				into #auxobjetivoobclientes  
+				from objetivoobclientes 	
+				join #periodoactual pa on 1 = 1 
+				where periodo between  pa.desdefecha and pa.hastafecha
+				and  codigo_cliente = case @Cliente when 0 then codigo_cliente else @Cliente end 
+				;
+				
+				--- obtengo objetivo de cliente y sucursal por submarca
+				Select  
+				periodo 
+				,afiliada
+				,codigo_cliente cuenta
+				,sucursal sucursal
+				,sum(Ob_submarca) objcliente
+				into #auxobjetivoclientesubmarca
+				from #auxobjetivoobclientes ob
+				where  Ob_submarca != 0
+				
+				group by 		
+				periodo ,afiliada ,codigo_cliente ,sucursal
+				
+				order by periodo, codigo_cliente, sucursal
+				;
+				--- obtengo objetivo de cliente y sucursal por cliente
+				Select  
+				periodo 
+				,afiliada
+				,codigo_cliente cuenta
+				,ob.sucursal sucursal
+				,sum(Ob_cliente) objcliente
+				into #auxobjetivocliente
+				from #auxobjetivoobclientes ob
+				where  Ob_cliente != 0 
+				--and not exists (select 1 from #auxobjetivoclientesubmarca mc where mc.cuenta=ob.codigo_cliente and mc.sucursal = ob.sucursal and mc.periodo = ob.periodo)
+				
+				group by 		
+				periodo ,afiliada ,codigo_cliente ,sucursal 
+				
+				order by periodo, codigo_cliente, sucursal 
+				
+				;
+				--- obtengo objetivo de cliente y sucursal por marca excluyo los clientes con submarca
+				Select  
+				periodo 
+				,afiliada
+				,codigo_cliente cuenta
+				,ob.sucursal sucursal
+				,sum(Ob_marca) objcliente
+				into #auxobjetivoclientemarca
+				from #auxobjetivoobclientes ob
+				where  Ob_marca != 0 
+				--and not exists (select 1 from #auxobjetivoclientesubmarca mc where mc.cuenta=ob.codigo_cliente and mc.sucursal = ob.sucursal and mc.periodo = ob.periodo )
+				
+				group by 		
+				periodo ,afiliada ,codigo_cliente ,sucursal
+				
+				order by periodo, codigo_cliente ,sucursal
+				
+				
+				;
+				--- obtengo objetivo de cliente y sucursal por cliente excluyo los clientes con marca
+				select 
+				periodo
+				,cuenta
+				,sucursal
+				,sum(objcliente)objcliente
+				into #objetivoxclientecargado
+				from #auxobjetivocliente oc
+				--where not exists (select 1 from #auxobjetivoclientemarca mc where mc.cuenta=oc.cuenta and mc.sucursal = oc.sucursal and mc.periodo = oc.periodo )
+				group by 
+				periodo, cuenta ,sucursal
+				;
+				
+				--inserto los objetivos a la tabla auxiliar
+				insert into #objetivoxclientecargado
+				Select  
+				periodo
+				,cuenta
+				,sucursal
+				,sum(objcliente)objcliente
+				from #auxobjetivoclientemarca
+				group by 
+				periodo, cuenta ,sucursal
+				
+				;
+				--inserto los objetivos a la tabla auxiliar
+				insert into #objetivoxclientecargado
+				Select  
+				periodo
+				,cuenta
+				,sucursal
+				,sum(objcliente)objcliente
+				from #auxobjetivoclientesubmarca
+				group by 
+				periodo, cuenta ,sucursal
+				
+				;
+				
+				insert into #objetivoxclientecargado
+				
+				Select 
+				Periodo
+				,Cliente
+				,Sucursal
+				,sum(Sugeridoobcliente)objcliente  
+				from asignacion_obj_x_afiliada_x_cliente
+				join #periodoactual pa on 1 = 1 
+				
+				where periodo between  pa.desdefecha and pa.hastafecha
+				and  Cliente = case @Cliente when 0 then Cliente else @Cliente end 
+				group by 	Periodo
+				,Cliente
+				,Sucursal
+				
+				--- agrupo cliente y sucursal en 1 sola linea por cliente y sucursal para optimizar consulta de cantidad en unidades
+				Select cuenta , sucursal  into #auxobjetivoxclientecargado  from #objetivoxclientecargado group by cuenta , sucursal 
+				;
+				-- obtengo las ventas de los cliente con objetivos y saco el periodo de la venta
+				Select 
+				(cast((rtrim(datepart(year, do.fecha))+rtrim(ca.mes)) as numeric(6))) periodo 
+				--(cast((rtrim(datepart(year, do.fecha))+rtrim(datepart(month, do.fecha))) as numeric(6))) periodo 
+				,do.fecha
+				,do.vendedor
+				,do.cuenta
+				,do.sucursal
+				,td.venta
+				,sum(da.cantidad*td.indiventa) totalventa
+				into #cuentastransasinobj
+				from documentos do with(nolock) 
+				join docarti da with(nolock) on do.empresa=da.empresa and do.clavecorr = da.clavecorr and do.serie = da.serie and do.nrodoc = da.nrodoc
+				join tipodoc td with(nolock) on td.codigo = do.tipodocum 
+				join cuentas cu with(nolock) on cu.codigo = do.cuenta and do.tipocuenta = cu.tipocuenta
+				join #auxobjetivoxclientecargado obc on do.cuenta = obc.cuenta and do.sucursal = obc.sucursal --and (cast((rtrim(datepart(year, do.fecha))+rtrim(datepart(month, do.fecha))) as numeric(6))) = obc.periodo
+				join calendarioventamensual ca with(nolock) on cast(ca.fecha as date) = cast(do.fecha as date)
+				
+				where 
+				do.fecha between @DesdeFecha and @HastaFecha 
+				and do.anulado = 0
+				and td.venta>1
+				and cu.inactivo = 0 
+				and cu.tipocuenta=1
+				and ca.laborable = 1
+				and do.clavecorr in ('FA','NC')
+				and do.cuenta = case @Cliente when 0 then do.cuenta else @Cliente end 
+				and do.vendedor = case @Vendedor when '' then do.vendedor else @Vendedor end
+				
+				group by 
+				do.fecha, ca.mes, do.vendedor ,do.cuenta, do.sucursal, td.venta
+				
+				
+				order by
+				do.cuenta, do.sucursal,  do.vendedor, do.fecha  	
+				
+				
+				
+				;
+				
+				--  realizo la sumatoria de las compras de los clientes tomando en cuenta periodo,vendedor,cuenta, sucursal, y que tengan objetivo cargado para el periodo
+				Select 
+				ob.periodo
+				,fecha
+				,vendedor
+				,ob.cuenta
+				,ob.sucursal
+				,totalventa
+				,venta
+				,sum(totalventa) OVER (PARTITION BY ob.periodo,vendedor,ob.cuenta, ob.sucursal ORDER BY ob.periodo, Fecha, venta ) AS VolumenAcumulado
+				
+				into #auxvolumenacumulado 
+				from #cuentastransasinobj ob
+				join #objetivoxclientecargado do on do.cuenta = ob.cuenta and do.sucursal = ob.sucursal and do.periodo = ob.periodo 
+				group by 
+				ob.periodo ,fecha ,vendedor ,ob.cuenta ,ob.sucursal , totalventa ,venta
+				order by 
+				ob.cuenta, ob.sucursal, fecha, vendedor
+				
+				
+				;
+				
+				Select
+				ob.periodo 
+				,do.fecha
+				,do.vendedor
+				,do.cuenta
+				,do.sucursal
+				,do.totalventa
+				,do.venta
+				,sum(ob.objcliente) ob_vol_gral
+				,sum(do.VolumenAcumulado)actual_vol
+				
+				
+				
+				into #objetivo_avance
+				from #objetivoxclientecargado ob
+				join #auxvolumenacumulado do on do.cuenta = ob.cuenta and do.sucursal = ob.sucursal and do.periodo = ob.periodo
+				
+				
+				group by 
+				ob.periodo
+				,do.fecha
+				,do.vendedor
+				,do.cuenta
+				,do.sucursal
+				,do.totalventa
+				,do.venta
+				
+				
+				
+				order by 
+				do.cuenta, do.sucursal, do.fecha, do.vendedor
+				;
+				
+								
+				Select  
+				oav.fecha
+				,oav.vendedor
+				,oav.cuenta
+				,oav.sucursal
+				,oav.ob_vol_gral
+				,oav.actual_vol
+				,(oav.ob_vol_gral-oav.actual_vol)Vol_pendiente
+				,(oav.actual_vol/oav.ob_vol_gral)Poralcance_vol 
+				--,ROW_NUMBER() OVER (PARTITION BY  oav.periodo, oav.cuenta, oav.sucursal, vendedor ORDER BY oav.periodo, Fecha  ) as numerado
+				,ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ) as numerado
+				,convert(numeric(12),(case when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 1 then (oav.ob_vol_gral/(isnull(pv.Promediovisita,1))) 
+				-- when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 2 then (oav.ob_vol_gral/(case when ((isnull(pv.Promediovisita,1))-1)<=0 then 1 else ((isnull(pv.Promediovisita,1))-1) end ))
+				else 0 end)) obvol_itinearar
+				
+				,case when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 1 then isnull(pv.Promediovisita,1)
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 2 then (case when ((isnull(pv.Promediovisita,1))-1)<=0 then 1 else ((isnull(pv.Promediovisita,1))-1) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 3 then (case when ((isnull(pv.Promediovisita,1))-2)<=0 then 1 else ((isnull(pv.Promediovisita,1))-2) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 4 then (case when ((isnull(pv.Promediovisita,1))-3)<=0 then 1 else ((isnull(pv.Promediovisita,1))-3) end )	
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 5 then (case when ((isnull(pv.Promediovisita,1))-4)<=0 then 1 else ((isnull(pv.Promediovisita,1))-4) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 6 then (case when ((isnull(pv.Promediovisita,1))-5)<=0 then 1 else ((isnull(pv.Promediovisita,1))-5) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 7 then (case when ((isnull(pv.Promediovisita,1))-6)<=0 then 1 else ((isnull(pv.Promediovisita,1))-6) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 8 then (case when ((isnull(pv.Promediovisita,1))-7)<=0 then 1 else ((isnull(pv.Promediovisita,1))-7) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 9 then (case when ((isnull(pv.Promediovisita,1))-8)<=0 then 1 else ((isnull(pv.Promediovisita,1))-8) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 10 then (case when ((isnull(pv.Promediovisita,1))-9)<=0 then 1 else ((isnull(pv.Promediovisita,1))-9) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 11 then (case when ((isnull(pv.Promediovisita,1))-10)<=0 then 1 else ((isnull(pv.Promediovisita,1))-10) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 12 then (case when ((isnull(pv.Promediovisita,1))-11)<=0 then 1 else ((isnull(pv.Promediovisita,1))-11) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 13 then (case when ((isnull(pv.Promediovisita,1))-12)<=0 then 1 else ((isnull(pv.Promediovisita,1))-12) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 14 then (case when ((isnull(pv.Promediovisita,1))-13)<=0 then 1 else ((isnull(pv.Promediovisita,1))-13) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 15 then (case when ((isnull(pv.Promediovisita,1))-14)<=0 then 1 else ((isnull(pv.Promediovisita,1))-14) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 16 then (case when ((isnull(pv.Promediovisita,1))-15)<=0 then 1 else ((isnull(pv.Promediovisita,1))-15) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 17 then (case when ((isnull(pv.Promediovisita,1))-16)<=0 then 1 else ((isnull(pv.Promediovisita,1))-16) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 18 then (case when ((isnull(pv.Promediovisita,1))-17)<=0 then 1 else ((isnull(pv.Promediovisita,1))-17) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 19 then (case when ((isnull(pv.Promediovisita,1))-18)<=0 then 1 else ((isnull(pv.Promediovisita,1))-18) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 20 then (case when ((isnull(pv.Promediovisita,1))-19)<=0 then 1 else ((isnull(pv.Promediovisita,1))-19) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 21 then (case when ((isnull(pv.Promediovisita,1))-20)<=0 then 1 else ((isnull(pv.Promediovisita,1))-20) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 22 then (case when ((isnull(pv.Promediovisita,1))-21)<=0 then 1 else ((isnull(pv.Promediovisita,1))-21) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 23 then (case when ((isnull(pv.Promediovisita,1))-22)<=0 then 1 else ((isnull(pv.Promediovisita,1))-22) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 24 then (case when ((isnull(pv.Promediovisita,1))-23)<=0 then 1 else ((isnull(pv.Promediovisita,1))-23) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 25 then (case when ((isnull(pv.Promediovisita,1))-24)<=0 then 1 else ((isnull(pv.Promediovisita,1))-24) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 26 then (case when ((isnull(pv.Promediovisita,1))-25)<=0 then 1 else ((isnull(pv.Promediovisita,1))-25) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 27 then (case when ((isnull(pv.Promediovisita,1))-26)<=0 then 1 else ((isnull(pv.Promediovisita,1))-26) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 28 then (case when ((isnull(pv.Promediovisita,1))-27)<=0 then 1 else ((isnull(pv.Promediovisita,1))-27) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 29 then (case when ((isnull(pv.Promediovisita,1))-28)<=0 then 1 else ((isnull(pv.Promediovisita,1))-28) end )
+				when (ROW_NUMBER() OVER (PARTITION BY oav.periodo, oav.vendedor,oav.cuenta, oav.sucursal ORDER BY oav.periodo, Fecha, venta ))= 30 then (case when ((isnull(pv.Promediovisita,1))-29)<=0 then 1 else ((isnull(pv.Promediovisita,1))-29) end )
+				
+				else 1 end Promediovisita
+				
+				,oav.totalventa
+				
+				into #primer_calculoobjetivo
+				from  #objetivo_avance oav
+				left join promedio_visita pv on pv.Cliente = oav.cuenta and pv.sucursal = oav.sucursal and pv.periodo = oav.periodo
+				order by oav.vendedor,oav.cuenta, oav.sucursal,oav.fecha, oav.venta
+				;
+				
+				Select  
+				
+				
+				Fecha
+				,Vendedor
+				,Cuenta
+				,Sucursal
+				,Ob_vol_gral
+				,Actual_vol
+				,Vol_pendiente
+				,Poralcance_vol
+				,Numerado
+				,case when numerado = 1 then Obvol_itinearar when numerado > 1 then  (LAG(Vol_pendiente, 1, 0) OVER (PARTITION  BY vendedor ,cuenta, sucursal ORDER BY  Fecha )/Promediovisita)  end Obvol_itinearar  
+				,Promediovisita
+				,Totalventa
+				into #ultimo_calculoobjetivo
+				from #primer_calculoobjetivo
+				
+				;
+				
+				Select 
+				Fecha Fecha
+				,Vendedor Vendedor
+				,Cuenta Cuenta
+				,Sucursal Sucursal
+				,Ob_vol_gral ob_vol_gral
+				,Actual_vol actual_vol_1
+				,Vol_pendiente vol_pendiente
+				,Poralcance_vol alcance_vol
+				,Numerado Numerado
+				,Obvol_itinearar Ob_vol_itinerareo
+				,Promediovisita Promediovisita
+				,Totalventa Actual_vol
+				,(Obvol_itinearar-Totalventa)volpendiente
+				,(Totalventa/Obvol_itinearar)alcancevol
+				
+				into #consultafinal
+				from #ultimo_calculoobjetivo				
+				
+				
+				;
+				
+				Select 
+				'Fecha' fecha             
+				,'Ruta' ruta
+				,'POS Name' Pos_name
+				,'POS Code' pos_cod
+				,'OB Vol Gral' ob_vol_gral
+				,'Actuals Vol' actual_vol_1
+				,'Volumen Pendiente' vol_pendiente
+				,'% Alcance Vol' alcance_vol
+				,'OB Vol x itinerario' Ob_vol_itinerareo
+				,'Actuals Vol' Actual_vol
+				,'Volumen Pendiente' volpendiente
+				,'% Alcance Vol' alcancevol
+				,1 orden
+				
+				union all
+				
+				
+				Select 
+				rtrim(convert(char(10),ax.fecha,103)) fecha
+				,rtrim(ve.codigousuario)ruta
+				,rtrim(su.nombre)Pos_name
+				,rtrim(su.codigoak)pos_cod
+				,rtrim(cast(ob_vol_gral as numeric(12)))ob_vol_gral
+				,rtrim(actual_vol_1)actual_vol_1
+				,rtrim(cast(vol_pendiente as numeric(12)))vol_pendiente
+				,rtrim((alcance_vol)*100)+'%' alcance_vol
+				,rtrim(Ob_vol_itinerareo)Ob_vol_itinerareo
+				,rtrim(Actual_vol)Actual_vol
+				,rtrim(volpendiente)volpendiente
+				,rtrim((alcancevol)*100)+'%'alcancevol
+				,2 orden
+				
+				from #consultafinal ax
+				join vendedor ve with(nolock) on ve.codigo = ax.vendedor
+				join sucursales su with(nolock) on su.codigo = ax.cuenta and su.sucursal = ax.sucursal and su.tipocuenta = 1
+				
+				order by orden--, ax.cuenta, ax.sucursal, ax.fecha, ax.vendedor
+				
+				
+				
+				IF (OBJECT_ID('tempdb..#periodoactual')) IS NOT NULL DROP TABLE #periodoactual;
+				IF (OBJECT_ID('tempdb..#auxobjetivoobclientes')) IS NOT NULL DROP TABLE #auxobjetivoobclientes;
+				IF (OBJECT_ID('tempdb..#auxobjetivoclientesubmarca')) IS NOT NULL DROP TABLE #auxobjetivoclientesubmarca;
+				IF (OBJECT_ID('tempdb..#auxobjetivocliente')) IS NOT NULL DROP TABLE #auxobjetivocliente;
+				IF (OBJECT_ID('tempdb..#auxobjetivoclientemarca')) IS NOT NULL DROP TABLE #auxobjetivoclientemarca;
+				IF (OBJECT_ID('tempdb..#objetivoxclientecargado')) IS NOT NULL DROP TABLE #objetivoxclientecargado;
+				IF (OBJECT_ID('tempdb..#auxobjetivoxclientecargado')) IS NOT NULL DROP TABLE #auxobjetivoxclientecargado;
+				IF (OBJECT_ID('tempdb..#cuentastransasinobj')) IS NOT NULL DROP TABLE #cuentastransasinobj;
+				IF (OBJECT_ID('tempdb..#auxvolumenacumulado')) IS NOT NULL DROP TABLE #auxvolumenacumulado;
+				IF (OBJECT_ID('tempdb..#avanceobvolactual')) IS NOT NULL DROP TABLE #avanceobvolactual;
+				IF (OBJECT_ID('tempdb..#objetivo_avance')) IS NOT NULL DROP TABLE #objetivo_avance;
+				IF (OBJECT_ID('tempdb..#primer_calculoobjetivo')) IS NOT NULL DROP TABLE #primer_calculoobjetivo;
+				IF (OBJECT_ID('tempdb..#ultimo_calculoobjetivo')) IS NOT NULL DROP TABLE #ultimo_calculoobjetivo;
+				IF (OBJECT_ID('tempdb..#consultafinal')) IS NOT NULL DROP TABLE #consultafinal;
